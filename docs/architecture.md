@@ -23,9 +23,9 @@ We build a layered service inside a client-server system fronted by an API gatew
 flowchart LR
   B[Browser<br/>HTML + app.js] --> G[Shared Core<br/>API gateway]
   G --> MM[Mentor Matching<br/>our service]
-  G --> A[Shared Core<br/>auth + users]
+  G --> A[Shared Core<br/>auth + profiles]
   MM -- validate token --> A
-  MM -- look up user --> A
+  MM -- read/write profile --> A
   MM -. later sprints .-> N[Notifications]
   MM -. later sprints .-> T[App Tracker]
 ```
@@ -54,7 +54,7 @@ flowchart TD
 | `MentoringApp.java` | API / controller | Entry point: starts the server, defines routes, validates the token via Shared Core, validates input, returns the shared error format |
 | `MentorProfile.java` | Domain | Mentor fields plus rules (e.g. mentee capacity cannot go below current mentees) |
 | `StudentMatchProfile.java` | Domain | Student matching fields plus rules (at least one target industry or guidance area) |
-| `ProfileData.java` | Persistence | Save, find, update and list profiles; the only class that knows how data is stored |
+| `ProfileData.java` | Persistence | Save, find, update and list profiles; the only class that knows which attributes come from Shared Core and which we store ourselves |
 
 As the service grows, split `MentoringApp.java` into one controller per resource and keep it as the bootstrap only. Put the guidance-area and industry lists in a shared enum file (see ADR-002).
 
@@ -67,7 +67,7 @@ sequenceDiagram
   participant U as mentorprofile.html + app.js
   participant G as API gateway
   participant M as MentoringApp
-  participant A as Shared Core auth
+  participant A as Shared Core
   participant D as ProfileData
   U->>G: POST /mentors/profile (JWT, JSON)
   G->>M: route request
@@ -75,7 +75,9 @@ sequenceDiagram
   A-->>M: userId, role = Mentor
   M->>M: validate fields, build MentorProfile
   M->>D: save(profile)
-  D-->>M: saved profile
+  D->>A: PUT /users/{id} (Shared Core-owned attributes)
+  D->>D: store matching-only attributes
+  D-->>M: merged profile
   M-->>U: 201 Created + profile JSON
 ```
 
@@ -89,36 +91,37 @@ The student flow is identical against `studentprofile.html` and `POST /students/
 
 ## Data model
 
-Both profiles hold only matching-specific fields and point to the Shared Core `User` by `userId`. Name, GMU email, program, graduation year, employer and title already live in the Shared Core base profile, so we read them from `GET /users/{id}` instead of copying them (SOW Section 4 constraint).
+Shared Core will provide a base profile class plus an extended class for each of four types (we assume the four SOW roles: Student, Mentor, Career Services Staff, Platform Admin). We depend on the Mentor and Student extensions. Which attributes go in those extensions versus our service is not agreed yet, so the tables list every attribute matching needs with a proposed owner. Our classes hold `userId` and map Shared Core's JSON; they never inherit from Shared Core classes (ADR-003).
 
 **MentorProfile**
 
-| Field | Type | Notes |
-| - | - | - |
-| `userId` | UUID | FK to Shared Core User; one profile per user |
-| `industry` | enum `Industry` | Shared list with student profile |
-| `guidanceAreas` | set of enum `GuidanceArea` | Resume review, mock interviews, industry insight, negotiation, general career, technical domain |
-| `technicalDomains` | list of string | Only when `TECHNICAL_DOMAIN` is offered |
-| `hoursPerMonth` | int | 1 to 40 |
-| `contactMethod` | enum | Email, video call, phone |
-| `maxMentees` | int | Capacity; matching later uses `maxMentees - activeMentees` |
-| `activeMentees` | int | Starts at 0; updated by connections in Sprint 3 |
-| `acceptingMentees` | boolean | Lets a mentor pause without deleting the profile |
-| `createdAt`, `updatedAt` | timestamp | |
+| Attribute | Type | Proposed owner | Notes |
+| - | - | - | - |
+| `userId` | UUID | Shared Core | Key linking everything |
+| name, email, program, grad year | various | Shared Core | Base profile per SOW |
+| `employer`, `title` | string | Shared Core | SOW puts these in the mentor base profile |
+| `industry` | enum `Industry` | TBD | Describes the person, so likely Shared Core |
+| `guidanceAreas` | set of enum `GuidanceArea` | Us | Resume review, mock interviews, industry insight, negotiation, general career, technical domain |
+| `technicalDomains` | list of string | Us | Only when `TECHNICAL_DOMAIN` is offered |
+| `hoursPerMonth` | int | TBD | 1 to 40 |
+| `contactMethod` | enum | TBD | Email, video call, phone |
+| `maxMentees` | int | Us | Capacity used by matching |
+| `activeMentees` | int | Us | Updated by connections in Sprint 3 |
+| `acceptingMentees` | boolean | Us | Pause without deleting the profile |
 
 **StudentMatchProfile**
 
-| Field | Type | Notes |
-| - | - | - |
-| `userId` | UUID | FK to Shared Core User; one profile per user |
-| `targetIndustries` | set of enum `Industry` | Same list as mentors |
-| `targetRoles` | list of string | e.g. SWE intern, data analyst |
-| `guidanceWanted` | set of enum `GuidanceArea` | Same list as mentors |
-| `targetCompanies` | list of string | Preferred mentor background |
-| `preferSameProgram` | boolean | Preferred mentor background |
-| `createdAt`, `updatedAt` | timestamp | |
+| Attribute | Type | Proposed owner | Notes |
+| - | - | - | - |
+| `userId` | UUID | Shared Core | Key linking everything |
+| name, email, program, grad year | various | Shared Core | Base profile per SOW |
+| `targetIndustries` | set of enum `Industry` | TBD | Subsystem 2 may also use it |
+| `targetRoles` | list of string | TBD | Subsystem 2 may also use it |
+| `guidanceWanted` | set of enum `GuidanceArea` | Us | Same enum as mentors |
+| `targetCompanies` | list of string | Us | Preferred mentor background |
+| `preferSameProgram` | boolean | Us | Preferred mentor background |
 
-Because both sides use the same `Industry` and `GuidanceArea` enums, the future matching score is a set overlap, not text parsing.
+Rule for settling the TBD rows: attributes that describe the person go to Shared Core; attributes that only matter for matching stay with us. If `industry` lands in Shared Core, they need to use the same `Industry` enum values so matching stays a set overlap.
 
 ## Interface contracts
 
@@ -138,11 +141,12 @@ The whole subsystem ships as one Docker container that runs with `docker build` 
 
 | Risk | Fallback |
 | - | - |
-| Shared Core auth is late | Stub `GET /auth/validate` behind a config flag that returns a fixed test user; remove before Sprint 2 |
-| Profile storage location unclear | ADR-001 isolates it in `ProfileData`; ask Shared Core in Week 3 |
-| Mentor supply far below student demand | Capacity fields exist from day one so matching can respect them |
+| Shared Core auth or profile endpoints are late | Stub `/auth/validate` and `/users/{id}` behind a config flag; remove before Sprint 2 |
+| Attribute split with Shared Core not agreed | Proposed-owner columns in the data model; `ProfileData` isolates the change |
+| Mentor supply far below student demand | Capacity attributes exist from day one so matching can respect them |
 | Endpoint paths clash in the gateway | Confirm the `/mentors` and `/students` prefixes with Shared Core before posting contracts |
 
-- [ ] Does Shared Core want our extended fields stored in its user data layer, or in our own tables?
-- [ ] Final `Industry` and `GuidanceArea` value lists, agreed with Subsystems 2 and 8
+- [ ] Get the attribute list and types for Shared Core's Mentor and Student extended classes, then settle the TBD rows
+- [ ] Confirm the four extended types are the four SOW roles
+- [ ] Final `Industry` and `GuidanceArea` value lists, agreed with Shared Core and Subsystems 2 and 8
 - [ ] Framework decision for ADR-004 at the next Friday sync
