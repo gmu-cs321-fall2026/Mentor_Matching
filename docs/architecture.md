@@ -52,6 +52,7 @@ flowchart TD
 | `mentorprofile.html`, `studentprofile.html` | Presentation | Forms to create and edit each profile type; no logic beyond layout |
 | `app.js` | Presentation | Reads form values, calls our REST endpoints with the auth token, renders results and field errors |
 | `MentoringApp.java` | API / controller | Entry point: starts the server, defines routes, validates the token via Shared Core, validates input, returns the shared error format |
+| `EditProfile.java` | API / controller | Handles `PUT` for the caller's own profile, using the role in the token to choose mentor or student; loads the profile through `ProfileData`, updates only the matching attributes we own (Shared Core fields are read through its API but never edited here, and `activeMentees` is system-managed), re-runs the domain rules, saves to our store and returns the updated profile or the shared error format |
 | `MentorProfile.java` | Domain | Mentor fields plus rules (e.g. mentee capacity cannot go below current mentees) |
 | `StudentMatchProfile.java` | Domain | Student matching fields plus rules (at least one target industry or guidance area) |
 | `ProfileData.java` | Persistence | Save, find, update and list profiles; the only class that knows which attributes come from Shared Core and which we store ourselves |
