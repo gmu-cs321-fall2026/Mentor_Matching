@@ -91,6 +91,9 @@ public final class MentorMatcher {
             weightedSum += WEIGHT_ROLE * coverage(roleTerms, expertise);
             totalWeight += WEIGHT_ROLE;
         }
+        if (weightedSum <= 0.0) {
+            return 0.0;
+        }
 
         // Experience and capacity always apply.
         weightedSum += WEIGHT_EXPERIENCE * experienceScore(mentor.getYearsOfExperience());
