@@ -28,4 +28,4 @@
 
 ## Status
 
-Most Sprint 1 implementation work is complete. The remaining items are the Docker build verification, publishing the interface contracts to the wiki, and team review of the relevant changes.
+
