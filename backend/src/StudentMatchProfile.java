@@ -2,7 +2,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,14 +23,10 @@ import java.util.UUID;
  * <p>Setters reject values that are wrong on their own. Rules that span fields
  * are checked by {@link #validate()}, so the API layer can return one 400 with
  * per-field detail instead of failing on the first bad field.
+ *
+ * @see MentorProfile the other side of the match, built the same way
  */
 public class StudentMatchProfile {
-
-    /** Most entries a free-text list may hold. */
-    public static final int MAX_LIST_ENTRIES = 10;
-
-    /** Longest a single free-text entry may be. */
-    public static final int MAX_ENTRY_LENGTH = 100;
 
     private final UUID userId;
 
@@ -115,7 +110,7 @@ public class StudentMatchProfile {
      * @param roles the new list, or null/empty to clear it
      */
     public void setTargetRoles(List<String> roles) {
-        replaceTextList(targetRoles, roles, "targetRoles");
+        ProfileText.replaceList(targetRoles, roles, "targetRoles");
     }
 
     /** Employers the student would like a mentor to have worked at. */
@@ -129,7 +124,7 @@ public class StudentMatchProfile {
      * @param companies the new list, or null/empty to clear it
      */
     public void setTargetCompanies(List<String> companies) {
-        replaceTextList(targetCompanies, companies, "targetCompanies");
+        ProfileText.replaceList(targetCompanies, companies, "targetCompanies");
     }
 
     /** True when the student would rather match a mentor from their own degree program. */
@@ -163,39 +158,6 @@ public class StudentMatchProfile {
     /** Convenience for callers that only need a yes or no. */
     public boolean isValid() {
         return validate().isEmpty();
-    }
-
-    /**
-     * Trims, drops blanks and collapses case-insensitive duplicates, then
-     * enforces the per-entry and per-list limits before touching {@code target}.
-     */
-    private static void replaceTextList(List<String> target, List<String> values, String field) {
-        List<String> cleaned = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
-        if (values != null) {
-            for (String value : values) {
-                if (value == null) {
-                    throw new IllegalArgumentException(field + " may not contain a null entry");
-                }
-                String trimmed = value.trim();
-                if (trimmed.isEmpty()) {
-                    continue;
-                }
-                if (trimmed.length() > MAX_ENTRY_LENGTH) {
-                    throw new IllegalArgumentException(
-                            field + " entries may be at most " + MAX_ENTRY_LENGTH + " characters");
-                }
-                if (seen.add(trimmed.toLowerCase())) {
-                    cleaned.add(trimmed);
-                }
-            }
-        }
-        if (cleaned.size() > MAX_LIST_ENTRIES) {
-            throw new IllegalArgumentException(
-                    field + " may list at most " + MAX_LIST_ENTRIES + " entries");
-        }
-        target.clear();
-        target.addAll(cleaned);
     }
 
     /** Two profiles are the same profile when they describe the same user. */
