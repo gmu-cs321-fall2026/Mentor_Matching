@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mentor Matching — Mason CareerLaunch</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Mentor Matching</h1>
+  <p>Mason CareerLaunch &middot; Subsystem 4 &middot; Sprint 1 walking skeleton</p>
+</header>
+
+<main>
+  <section>
+    <h2>Profile forms</h2>
+    <p class="hint">Create, view and update a matching profile end to end.</p>
+    <p>
+      <a href="mentorprofile.html">Mentor profile</a> — what you offer, your availability and your
+      capacity, plus the mentor directory.
+    </p>
+    <p>
+      <a href="studentprofile.html">Student matching profile</a> — the industries, roles and guidance
+      you are looking for.
+    </p>
+  </section>
+
+  <section>
+    <h2>Endpoints</h2>
+    <p class="hint">Interface contracts v1 are on the project wiki; this is the summary.</p>
+    <table>
+      <thead><tr><th>Method and path</th><th>Role</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>POST /mentors/profile</td><td>Mentor</td><td>Create a mentor profile</td></tr>
+        <tr><td>GET /mentors/profile</td><td>Mentor</td><td>Read your own mentor profile</td></tr>
+        <tr><td>PUT /mentors/profile</td><td>Mentor</td><td>Update your own mentor profile</td></tr>
+        <tr><td>POST /students/match-profile</td><td>Student</td><td>Create a student matching profile</td></tr>
+        <tr><td>GET /students/match-profile</td><td>Student</td><td>Read your own matching profile</td></tr>
+        <tr><td>PUT /students/match-profile</td><td>Student</td><td>Update your own matching profile</td></tr>
+        <tr><td>GET /mentors</td><td>Any signed in</td><td>Paginated, filterable mentor directory</td></tr>
+        <tr><td>GET /enums</td><td>Public</td><td>Agreed Industry, GuidanceArea and ContactMethod values</td></tr>
+        <tr><td>GET /health</td><td>Public</td><td>Liveness check for compose and the gateway</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+</body>
+</html>

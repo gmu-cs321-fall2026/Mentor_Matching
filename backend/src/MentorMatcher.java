@@ -6,19 +6,20 @@ import java.util.Set;
 /**
  * Calculates a mentor/student compatibility score in the range 0.0 to 1.0.
  *
+ * <p><b>Sprint 3 work, not Sprint 1.</b> It lives here as a head start and is
+ * not wired to any endpoint; matching, recommendations and connections are all
+ * listed as out of scope for Sprint 1.
+ *
  * <p>The score is a weighted average of scaled components. Each component is
  * scaled to 0-1 first, so the weights below are the only place that decides how
  * much each factor matters.
  *
  * <pre>
  *   guidance overlap     0.35   share of the student's wanted guidance areas the mentor offers
- *   industry overlap     0.25   share of the student's target industries the mentor covers
- *   role overlap         0.20   share of the student's target roles the mentor covers
- *   experience           0.10   min(years, 15) / 15
- *   available capacity   0.10   1 - currentStudents / maxStudents
+ *   industry overlap     0.25   whether the mentor's industry is one the student is targeting
+ *   role overlap         0.20   share of the student's target roles the mentor's domains cover
+ *   available capacity   0.10   1 - activeMentees / maxMentees
  * </pre>
- * The weights sum to 1.0. The 0.05 originally planned for "same program" was
- * given to role overlap because the mentor class has no program data.
  *
  * <p>Design rules:
  * <ul>
@@ -31,26 +32,35 @@ import java.util.Set;
  *   <li>A student who fails {@link StudentMatchProfile#isValid()} scores 0.</li>
  * </ul>
  *
- * <p>ASSUMPTIONS (the current MentorProfile has no GuidanceArea/Industry sets):
+ * <p>CHANGED when Sprint 1 landed: the first draft scored a mentor's free-text
+ * {@code expertiseAreas} against text converted from the student's enums, and
+ * read {@code getYearsOfExperience()}, {@code getMaxStudents()} and
+ * {@code getCurrentStudentCount()}. None of those exist on
+ * {@link MentorProfile}, so the file did not compile. It now uses the data model
+ * in /docs/architecture.md:
  * <ol>
- *   <li>The mentor's free-text {@code expertiseAreas} stand in for guidance
- *       areas, industries and roles. Student enum values are converted to text
- *       (RESUME_REVIEW becomes "resume review") and compared to expertise text.</li>
- *   <li>{@code targetCompanies} and {@code preferSameProgram} are not scored:
- *       the mentor class has no employer history or program field.</li>
- *   <li>Scores are doubles from 0.0 to 1.0, not percentages.</li>
+ *   <li>Guidance and industry are compared as enum set overlap rather than text.
+ *       ADR-002 chose shared enums precisely so this is an intersection with an
+ *       explainable reason, and keeps free text out of scored categories.</li>
+ *   <li>Role overlap compares the student's {@code targetRoles} against the
+ *       mentor's {@code technicalDomains}, the two free-text fields ADR-002 does
+ *       allow, still using the whole-word {@link #termsMatch} rule.</li>
+ *   <li>The 0.10 experience component is gone: years of experience is not an
+ *       attribute in the mentor data model. The weights now sum to 0.90 and the
+ *       renormalization already in {@code calculateCompatibility} handles it, so
+ *       scores still span 0.0 to 1.0. If the team wants experience scored, it
+ *       has to be added to the data model and the wiki contract first.</li>
+ *   <li>Capacity reads {@code maxMentees} and {@code activeMentees}.</li>
  * </ol>
+ * The weighting scheme, the coverage-not-Jaccard choice, the renormalization and
+ * the hard capacity filter are all as first written.
  */
 public final class MentorMatcher {
 
     public static final double WEIGHT_GUIDANCE = 0.35;
     public static final double WEIGHT_INDUSTRY = 0.25;
     public static final double WEIGHT_ROLE = 0.20;
-    public static final double WEIGHT_EXPERIENCE = 0.10;
     public static final double WEIGHT_CAPACITY = 0.10;
-
-    /** Years of experience at or above this count as a full experience score. */
-    public static final int EXPERIENCE_CAP_YEARS = 15;
 
     private MentorMatcher() {
     }
@@ -69,51 +79,62 @@ public final class MentorMatcher {
             return 0.0;
         }
 
-        Set<String> expertise = normalizedExpertise(mentor);
-
         double weightedSum = 0.0;
         double totalWeight = 0.0;
 
-        Set<String> guidanceTerms = enumTerms(student.getGuidanceWanted());
-        if (!guidanceTerms.isEmpty()) {
-            weightedSum += WEIGHT_GUIDANCE * coverage(guidanceTerms, expertise);
+        Set<GuidanceArea> guidanceWanted = student.getGuidanceWanted();
+        if (!guidanceWanted.isEmpty()) {
+            weightedSum += WEIGHT_GUIDANCE * enumCoverage(guidanceWanted, mentor.getGuidanceAreas());
             totalWeight += WEIGHT_GUIDANCE;
         }
 
-        Set<String> industryTerms = enumTerms(student.getTargetIndustries());
-        if (!industryTerms.isEmpty()) {
-            weightedSum += WEIGHT_INDUSTRY * coverage(industryTerms, expertise);
+        Set<Industry> targetIndustries = student.getTargetIndustries();
+        if (!targetIndustries.isEmpty()) {
+            boolean covered = mentor.getIndustry() != null
+                    && targetIndustries.contains(mentor.getIndustry());
+            weightedSum += WEIGHT_INDUSTRY * (covered ? 1.0 : 0.0);
             totalWeight += WEIGHT_INDUSTRY;
         }
 
         Set<String> roleTerms = textTerms(student.getTargetRoles());
         if (!roleTerms.isEmpty()) {
-            weightedSum += WEIGHT_ROLE * coverage(roleTerms, expertise);
+            weightedSum += WEIGHT_ROLE * coverage(roleTerms, textTerms(mentor.getTechnicalDomains()));
             totalWeight += WEIGHT_ROLE;
         }
         if (weightedSum <= 0.0) {
             return 0.0;
         }
 
-        // Experience and capacity always apply.
-        weightedSum += WEIGHT_EXPERIENCE * experienceScore(mentor.getYearsOfExperience());
-        totalWeight += WEIGHT_EXPERIENCE;
-
+        // Capacity always applies.
         weightedSum += WEIGHT_CAPACITY * capacityScore(mentor);
         totalWeight += WEIGHT_CAPACITY;
 
         return clamp01(weightedSum / totalWeight);
     }
 
-    /** Fraction of the student's terms that at least one mentor expertise matches. */
-    static double coverage(Set<String> studentTerms, Set<String> mentorExpertise) {
+    /** Fraction of the student's wanted areas the mentor also offers (ADR-002 set overlap). */
+    static <E extends Enum<E>> double enumCoverage(Set<E> wanted, Set<E> offered) {
+        if (wanted.isEmpty()) {
+            return 0.0;
+        }
+        int matched = 0;
+        for (E value : wanted) {
+            if (offered.contains(value)) {
+                matched++;
+            }
+        }
+        return (double) matched / wanted.size();
+    }
+
+    /** Fraction of the student's terms that at least one mentor term matches. */
+    static double coverage(Set<String> studentTerms, Set<String> mentorTerms) {
         if (studentTerms.isEmpty()) {
             return 0.0;
         }
         int matched = 0;
         for (String term : studentTerms) {
-            for (String expertise : mentorExpertise) {
-                if (termsMatch(term, expertise)) {
+            for (String mentorTerm : mentorTerms) {
+                if (termsMatch(term, mentorTerm)) {
                     matched++;
                     break;
                 }
@@ -135,32 +156,18 @@ public final class MentorMatcher {
         return paddedA.contains(paddedB) || paddedB.contains(paddedA);
     }
 
-    /** Scales years to 0-1 against a fixed cap, so scores do not drift as mentors are added. */
-    static double experienceScore(int years) {
-        int bounded = Math.min(Math.max(years, 0), EXPERIENCE_CAP_YEARS);
-        return (double) bounded / EXPERIENCE_CAP_YEARS;
-    }
-
     /** 1.0 for an empty roster down toward 0.0 as the mentor fills up. Only called when hasCapacity() is true. */
     static double capacityScore(MentorProfile mentor) {
-        int max = mentor.getMaxStudents();
+        int max = mentor.getMaxMentees();
         if (max <= 0) {
             return 0.0;
         }
-        return clamp01(1.0 - (double) mentor.getCurrentStudentCount() / max);
+        return clamp01(1.0 - (double) mentor.getActiveMentees() / max);
     }
 
     /** Lower-cases, turns underscores/hyphens into spaces and collapses whitespace. */
     static String normalize(String text) {
         return text.trim().toLowerCase(Locale.ROOT).replaceAll("[_\\-\\s]+", " ");
-    }
-
-    private static Set<String> enumTerms(Set<? extends Enum<?>> values) {
-        Set<String> terms = new HashSet<>();
-        for (Enum<?> value : values) {
-            terms.add(normalize(value.name()));
-        }
-        return terms;
     }
 
     private static Set<String> textTerms(List<String> values) {
@@ -171,12 +178,6 @@ public final class MentorMatcher {
             }
         }
         return terms;
-    }
-
-    /** MentorProfile allows null entries and exposes its raw list, so read defensively. */
-    private static Set<String> normalizedExpertise(MentorProfile mentor) {
-        List<String> raw = mentor.getExpertiseAreas();
-        return raw == null ? new HashSet<>() : textTerms(raw);
     }
 
     private static double clamp01(double value) {

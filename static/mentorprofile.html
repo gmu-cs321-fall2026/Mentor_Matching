@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mentor Profile — Mason CareerLaunch</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="mentor">
+
+<header>
+  <h1>Mentor profile</h1>
+  <p>Mason CareerLaunch &middot; Mentor Matching (Subsystem 4)</p>
+  <nav>
+    <a href="mentorprofile.html">Mentor profile</a>
+    <a href="studentprofile.html">Student profile</a>
+  </nav>
+</header>
+
+<main>
+  <section>
+    <h2>Sign in</h2>
+    <p class="hint">Your Shared Core token. In stub mode use <code>mentor-demo</code>.</p>
+    <div class="field">
+      <label for="token">Authorization token</label>
+      <input type="text" id="token" value="mentor-demo" autocomplete="off">
+    </div>
+    <button type="button" id="load" class="secondary">Load my profile</button>
+  </section>
+
+  <form id="profile-form" novalidate>
+    <section>
+      <h2>What you offer</h2>
+      <p class="hint">Name, email, employer and title come from your Shared Core account.</p>
+
+      <div class="field">
+        <label for="industry">Industry</label>
+        <select id="industry"><option value="">— not set —</option></select>
+        <p class="error" data-field="industry"></p>
+      </div>
+
+      <div class="field">
+        <label>Guidance areas</label>
+        <div class="checks" id="guidanceAreas"></div>
+        <small>Pick at least one.</small>
+        <p class="error" data-field="guidanceAreas"></p>
+      </div>
+
+      <div class="field">
+        <label for="technicalDomains">Technical domains</label>
+        <input type="text" id="technicalDomains" placeholder="Distributed systems, Machine learning">
+        <small>Comma separated. Only when you offer Technical domain guidance.</small>
+        <p class="error" data-field="technicalDomains"></p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Availability and capacity</h2>
+
+      <div class="field">
+        <label for="hoursPerMonth">Hours per month</label>
+        <input type="number" id="hoursPerMonth" min="1" max="40" value="4">
+        <small>Between 1 and 40.</small>
+        <p class="error" data-field="hoursPerMonth"></p>
+      </div>
+
+      <div class="field">
+        <label for="contactMethod">Preferred contact method</label>
+        <select id="contactMethod"><option value="">— not set —</option></select>
+        <p class="error" data-field="contactMethod"></p>
+      </div>
+
+      <div class="field">
+        <label for="maxMentees">Maximum mentees</label>
+        <input type="number" id="maxMentees" min="0" value="2">
+        <p class="error" data-field="maxMentees"></p>
+      </div>
+
+      <div class="field inline">
+        <input type="checkbox" id="acceptingMentees" checked>
+        <label for="acceptingMentees">Accepting new mentees</label>
+      </div>
+      <p class="error" data-field="acceptingMentees"></p>
+
+      <button type="button" id="create">Create profile</button>
+      <button type="button" id="update" class="secondary">Save changes</button>
+      <p id="status"></p>
+      <pre id="result" hidden></pre>
+    </section>
+  </form>
+
+  <section>
+    <h2>Mentor directory</h2>
+    <p class="hint">The paginated, filterable <code>GET /mentors</code> endpoint.</p>
+    <div class="filters">
+      <div class="field">
+        <label for="filter-industry">Industry</label>
+        <select id="filter-industry"><option value="">Any</option></select>
+      </div>
+      <div class="field">
+        <label for="filter-guidance">Guidance area</label>
+        <select id="filter-guidance"><option value="">Any</option></select>
+      </div>
+      <div class="field">
+        <label for="filter-size">Page size</label>
+        <input type="number" id="filter-size" min="1" max="100" value="20">
+      </div>
+      <div class="field inline">
+        <input type="checkbox" id="filter-capacity">
+        <label for="filter-capacity">With capacity only</label>
+      </div>
+      <button type="button" id="browse" class="secondary">Browse</button>
+    </div>
+    <p id="directory-status"></p>
+    <table id="directory" hidden>
+      <thead>
+        <tr><th>Mentor</th><th>Industry</th><th>Guidance</th><th>Capacity</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="pager" hidden>
+      <button type="button" id="prev" class="secondary">Previous</button>
+      <button type="button" id="next" class="secondary">Next</button>
+      <span id="page-label"></span>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

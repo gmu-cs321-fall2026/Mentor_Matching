@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Matching Profile — Mason CareerLaunch</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="student">
+
+<header>
+  <h1>Student matching profile</h1>
+  <p>Mason CareerLaunch &middot; Mentor Matching (Subsystem 4)</p>
+  <nav>
+    <a href="mentorprofile.html">Mentor profile</a>
+    <a href="studentprofile.html">Student profile</a>
+  </nav>
+</header>
+
+<main>
+  <section>
+    <h2>Sign in</h2>
+    <p class="hint">Your Shared Core token. In stub mode use <code>student-demo</code>.</p>
+    <div class="field">
+      <label for="token">Authorization token</label>
+      <input type="text" id="token" value="student-demo" autocomplete="off">
+    </div>
+    <button type="button" id="load" class="secondary">Load my profile</button>
+  </section>
+
+  <form id="profile-form" novalidate>
+    <section>
+      <h2>What you are looking for</h2>
+      <p class="hint">Name, email, program and graduation year come from your Shared Core account.</p>
+
+      <div class="field">
+        <label>Target industries</label>
+        <div class="checks" id="targetIndustries"></div>
+        <p class="error" data-field="targetIndustries"></p>
+      </div>
+
+      <div class="field">
+        <label>Guidance wanted</label>
+        <div class="checks" id="guidanceWanted"></div>
+        <small>Choose at least one target industry or guidance area.</small>
+        <p class="error" data-field="guidanceWanted"></p>
+      </div>
+
+      <div class="field">
+        <label for="targetRoles">Target roles</label>
+        <input type="text" id="targetRoles" placeholder="Data analyst, Software engineer">
+        <small>Comma separated.</small>
+        <p class="error" data-field="targetRoles"></p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Preferred mentor background</h2>
+
+      <div class="field">
+        <label for="targetCompanies">Target companies</label>
+        <input type="text" id="targetCompanies" placeholder="Capital One, Booz Allen">
+        <small>Comma separated.</small>
+        <p class="error" data-field="targetCompanies"></p>
+      </div>
+
+      <div class="field inline">
+        <input type="checkbox" id="preferSameProgram">
+        <label for="preferSameProgram">Prefer a mentor from my own program</label>
+      </div>
+      <p class="error" data-field="preferSameProgram"></p>
+
+      <button type="button" id="create">Create profile</button>
+      <button type="button" id="update" class="secondary">Save changes</button>
+      <p id="status"></p>
+      <pre id="result" hidden></pre>
+    </section>
+  </form>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

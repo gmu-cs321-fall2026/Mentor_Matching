@@ -1,0 +1,19 @@
+# Compiled output — never commit build artifacts, they cause merge conflicts
+*.class
+out/
+build/
+target/
+bin/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
