@@ -1,5 +1,6 @@
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * Save, find, update and list profiles.
@@ -83,4 +84,7 @@ interface ProfileData {
 
     /** Our student attributes merged under Shared Core's base profile. */
     Map<String, Object> studentView(StudentMatchProfile profile);
+    /** Recomandations. */
+    List<Map<String, Object>> rankMentors(StudentMatchProfile student);
+
 }
