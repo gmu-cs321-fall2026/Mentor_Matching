@@ -53,6 +53,22 @@ public class MentoringApp {
 
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         // Longest matching prefix wins, so /mentors/profile is reached before /mentors.
+        
+        server.createContext("/mentors/recommendations", route(exchange -> {
+            requireExactPath(exchange, "/mentors/recommendations");
+
+            SharedCoreClient.Principal caller = authenticate(exchange, sharedCore);
+            requireRole(caller, "Student");
+
+            if (!exchange.getRequestMethod().equals("GET")) {
+                throw ApiException.methodNotAllowed("use GET");
+            }
+
+            StudentMatchProfile student = data.findStudent(caller.userId());
+
+            respond(exchange, 200, data.rankMentors(student));
+        }));
+
         server.createContext("/mentors/profile", route(exchange ->
                 mentorProfile(exchange, sharedCore, data, editProfile)));
         server.createContext("/students/match-profile", route(exchange ->
