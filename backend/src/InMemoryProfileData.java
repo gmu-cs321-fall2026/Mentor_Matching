@@ -183,4 +183,38 @@ final class InMemoryProfileData implements ProfileData {
             throw ApiException.fields(fieldErrors);
         }
     }
+    
+    @Override
+    public List<Map<String, Object>> rankMentors(StudentMatchProfile student) {
+        List<MentorProfile> ranked = new ArrayList<>(mentors.values());
+
+        // Remove mentors who cannot take more students.
+        ranked.removeIf(mentor -> !mentor.hasCapacity());
+    
+        // Rank mentors by compatibility, highest first.
+        ranked.sort(Comparator
+            .comparingDouble((MentorProfile mentor) ->
+                MentorMatcher.calculateCompatibility(student, mentor))
+            .reversed()
+            .thenComparing(mentor -> mentor.getUserId().toString()));
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        int rank = 1;
+
+        for (MentorProfile mentor : ranked) {
+            double score = MentorMatcher.calculateCompatibility(student, mentor);
+
+            // Do not recommend mentors with zero compatibility.
+            if (score <= 0.0) {
+                continue;
+            }
+
+            Map<String, Object> result = mentorView(mentor);
+            result.put("rank", rank++);
+            result.put("compatibilityScore", score);
+            results.add(result);
+        }
+
+        return results;
+    }
 }
