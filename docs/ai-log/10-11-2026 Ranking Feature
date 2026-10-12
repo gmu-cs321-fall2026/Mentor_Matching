@@ -1,0 +1,8 @@
+Asked: Asked ChatGPT to help implement a mentor ranking feature using the existing compatibility algorithm in `MentorMatcher.java`. The goal was to return a list of available mentors ranked from highest to lowest compatibility score without making significant changes to the existing code.
+
+Produced: Generated code additions for three files:
+`ProfileData.java`: Added the `rankMentors()` method declaration.
+`InMemoryProfileData.java`: Implemented ranking logic to calculate compatibility scores, exclude mentors without capacity or positive compatibility, and return a sorted list with ranks and scores.
+`MentoringApp.java`: Added the `GET /mentors/recommendations` API endpoint to return ranked mentors based on the authenticated student's matching profile.
+
+Changed: Reviewed and adjusted the generated code to match the existing project structure and formatting. Kept the original compatibility algorithm unchanged and reused its scoring method. The ranking feature was added as a separate endpoint to avoid affecting the existing mentor directory and its filtering functionality.
