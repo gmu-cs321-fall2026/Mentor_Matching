@@ -1,0 +1,10 @@
+**Team Review Feedback:**
+
+- **GitHub Commits:** The reviewing team noticed that most or all commits were being made by one team member, making it difficult to identify individual contributions.
+- **Jira Ticket Descriptions:** Jira tickets lacked sufficient detail, making it difficult for reviewers to understand what tasks were being worked on and the expected deliverables.
+- **Unassigned Jira Tickets:** Several tickets were not assigned to specific team members, creating uncertainty about task ownership and responsibilities.
+
+**Areas for Improvement:**
+- Ensure each team member commits their own work to GitHub.
+- Write clear, descriptive Jira tickets that explain the task, its purpose, and expected outcome.
+- Assign every Jira ticket to a specific team member to establish accountability and make individual contributions easier to track.
