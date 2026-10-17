@@ -24,6 +24,7 @@ final class InMemoryProfileData implements ProfileData {
     private final SharedCoreClient sharedCore;
     private final Map<UUID, MentorProfile> mentors = new ConcurrentHashMap<>();
     private final Map<UUID, StudentMatchProfile> students = new ConcurrentHashMap<>();
+    private final Map<UUID, Connection> connections = new ConcurrentHashMap<>();
 
     InMemoryProfileData(SharedCoreClient sharedCore) {
         this.sharedCore = sharedCore;
@@ -216,5 +217,73 @@ final class InMemoryProfileData implements ProfileData {
         }
 
         return results;
+    }
+
+    @Override
+    public Map<String, Object> saveConnection(Connection connection) {
+        connections.put(connection.getId(), connection);
+        return connectionView(connection);
+    }
+
+    @Override
+    public Connection findConnection(UUID connectionId) {
+        Connection connection = connections.get(connectionId);
+        if (connection == null) {
+            throw ApiException.notFound("no connection " + connectionId);
+        }
+        return connection;
+    }
+
+    @Override
+    public Map<String, Object> updateConnection(Connection connection) {
+        connections.put(connection.getId(), connection);
+        return connectionView(connection);
+    }
+
+    @Override
+    public boolean hasOpenConnection(UUID studentId, UUID mentorId) {
+        for (Connection connection : connections.values()) {
+            if (connection.getStudentId().equals(studentId)
+                    && connection.getMentorId().equals(mentorId)
+                    && connection.getStatus().isOpen()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public List<Map<String, Object>> listConnections(UUID userId) {
+        List<Connection> mine = new ArrayList<>();
+        for (Connection connection : connections.values()) {
+            if (connection.isParticipant(userId)) {
+                mine.add(connection);
+            }
+        }
+        // Newest first; id breaks ties so the order is stable between calls.
+        mine.sort(Comparator.comparing(Connection::getCreatedAt).reversed()
+                .thenComparing(connection -> connection.getId().toString()));
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Connection connection : mine) {
+            items.add(connectionView(connection));
+        }
+        return items;
+    }
+
+    @Override
+    public Map<String, Object> connectionView(Connection connection) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("id", connection.getId().toString());
+        view.put("studentId", connection.getStudentId().toString());
+        view.put("studentName", sharedCore.getUser(connection.getStudentId()).get("name"));
+        view.put("mentorId", connection.getMentorId().toString());
+        view.put("mentorName", sharedCore.getUser(connection.getMentorId()).get("name"));
+        view.put("status", connection.getStatus());
+        view.put("message", connection.getMessage());
+        view.put("notes", connection.getNotes());
+        view.put("createdAt", connection.getCreatedAt().toString());
+        view.put("updatedAt", connection.getUpdatedAt().toString());
+        return view;
     }
 }
