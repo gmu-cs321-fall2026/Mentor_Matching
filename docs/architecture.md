@@ -1,6 +1,8 @@
-# Mentor Matching: Sprint 1 Architecture
+# Mentor Matching: Architecture
 
 Subsystem 4 of Mason CareerLaunch. Decisions are recorded in [`/docs/adr`](adr/). Interface contracts live on the project wiki.
+
+This document was written for Sprint 1, and the sections below still describe that design. What Sprint 3 adds is in [Sprint 3 additions](#sprint-3-additions) at the end.
 
 ## Overview and Sprint 1 scope
 
@@ -107,7 +109,7 @@ Shared Core will provide a base profile class plus an extended class for each of
 | `hoursPerMonth` | int | TBD | 1 to 40 |
 | `contactMethod` | enum | TBD | Email, video call, phone |
 | `maxMentees` | int | Us | Capacity used by matching |
-| `activeMentees` | int | Us | Updated by connections in Sprint 3 |
+| `activeMentees` | int | Us | Set only by connections: +1 on accept, −1 when an active connection ends |
 | `acceptingMentees` | boolean | Us | Pause without deleting the profile |
 
 **StudentMatchProfile**
@@ -126,7 +128,7 @@ Rule for settling the TBD rows: attributes that describe the person go to Shared
 
 ## Interface contracts
 
-See the project wiki page **Mentor Matching: Interface Contracts v1**. The wiki is the source of truth for other teams.
+See the project wiki pages **Mentor Matching: Interface Contracts v1** (profiles, directory) and **v2** (recommendations, connections). The wiki is the source of truth for other teams; [v1](interface-contracts-v1.md) and [v2](interface-contracts-v2.md) are the repo copies.
 
 ## Allocation view
 
@@ -142,7 +144,7 @@ The whole subsystem ships as one Docker container that runs with `docker build` 
 
 | Risk | Fallback |
 | - | - |
-| Shared Core auth or profile endpoints are late | Stub `/auth/validate` and `/users/{id}` behind a config flag; remove before Sprint 2 |
+| Shared Core auth or profile endpoints are late | Stub `/auth/validate` and `/users/{id}` behind a config flag. Planned for removal before Sprint 2; still on in Sprint 3 for tests and demos, and must be off in the compose environment |
 | Attribute split with Shared Core not agreed | Proposed-owner columns in the data model; `ProfileData` isolates the change |
 | Mentor supply far below student demand | Capacity attributes exist from day one so matching can respect them |
 | Endpoint paths clash in the gateway | Confirm the `/mentors` and `/students` prefixes with Shared Core before posting contracts |
@@ -151,3 +153,48 @@ The whole subsystem ships as one Docker container that runs with `docker build` 
 - [ ] Confirm the four extended types are the four SOW roles
 - [ ] Final `Industry` and `GuidanceArea` value lists, agreed with Shared Core and Subsystems 2 and 8
 - [ ] Framework decision for ADR-004 at the next Friday sync
+
+## Sprint 3 additions
+
+Sprint 3 turns recommendations into relationships: a student asks a recommended mentor to connect, and the mentor's capacity follows from the connections they accept. Contracts are in [interface-contracts-v2.md](interface-contracts-v2.md).
+
+### New modules
+
+The layering is unchanged; the new files slot into the existing layers.
+
+| File | Layer | Responsibility |
+| - | - | - |
+| `ConnectionService.java` | API / controller | Backs `POST` and `PUT /connections`: checks which side may make a move, keeps the mentor's `activeMentees` in step, and checks everything before changing anything so a rejected request leaves no partial change |
+| `Connection.java` | Domain | One request: the two user ids, status, message, shared notes, timestamps; owns the lifecycle table |
+| `ConnectionStatus.java` | Domain | `PENDING`, `ACTIVE`, `DECLINED`, `COMPLETED`, `WITHDRAWN` |
+| `ProfileData.java` | Persistence | Gains save, find, update and list for connections, so ADR-001's single persistence boundary still holds |
+| `MentorMatcher.java` | Domain | Unchanged scoring; now called by `rankMentors` for both recommendation routes |
+
+### Connection lifecycle
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: student sends request
+  PENDING --> ACTIVE: mentor accepts (activeMentees +1)
+  PENDING --> DECLINED: mentor declines
+  PENDING --> WITHDRAWN: student cancels
+  ACTIVE --> COMPLETED: either side (activeMentees −1)
+  ACTIVE --> WITHDRAWN: either side (activeMentees −1)
+  DECLINED --> [*]
+  COMPLETED --> [*]
+  WITHDRAWN --> [*]
+```
+
+Design rules:
+
+- **Capacity is checked twice:** when the request is sent and again when the mentor accepts, since other requests may have filled the mentor in between. A full mentor gets a `409`, not an over-allocation.
+- **One open connection per student-mentor pair.** A student can ask again once the earlier request is closed.
+- **Not-on-it reads as not-found.** A user who is not a participant gets `404`, so connection ids cannot be probed.
+- **Capacity changes are serialized** (`synchronized` in `ConnectionService`). That is enough for the in-memory store; a database implementation needs a transaction around the connection and mentor updates.
+
+### Risks added in Sprint 3
+
+| Risk | Fallback |
+| - | - |
+| Demand far exceeds mentor supply, so most requests sit in `PENDING` | Requests are only accepted for mentors with room; consider an expiry for old pending requests in Sprint 4 |
+| Notifications (Subsystem 8) contract not ready | Connections work without it; the mentor sees pending requests through `GET /connections` |

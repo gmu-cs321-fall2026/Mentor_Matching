@@ -84,7 +84,39 @@ interface ProfileData {
 
     /** Our student attributes merged under Shared Core's base profile. */
     Map<String, Object> studentView(StudentMatchProfile profile);
-    /** Recomandations. */
+    /**
+     * Recommendations behind {@code GET /mentors/recommendations}: mentors with
+     * room, best match first, leaving out anyone who scores 0.
+     *
+     * @return each mentor's view plus {@code rank} and {@code compatibilityScore}
+     */
     List<Map<String, Object>> rankMentors(StudentMatchProfile student);
 
+    /**
+     * Stores a new connection request.
+     *
+     * @return the connection's view
+     */
+    Map<String, Object> saveConnection(Connection connection);
+
+    /**
+     * @throws ApiException 404 if there is no such connection
+     */
+    Connection findConnection(UUID connectionId);
+
+    /**
+     * Stores changes to an existing connection.
+     *
+     * @return the connection's view
+     */
+    Map<String, Object> updateConnection(Connection connection);
+
+    /** True when this student and mentor already have a pending or active connection. */
+    boolean hasOpenConnection(UUID studentId, UUID mentorId);
+
+    /** Every connection the user is on, as student or mentor, newest first. */
+    List<Map<String, Object>> listConnections(UUID userId);
+
+    /** A connection with both people's names from Shared Core. */
+    Map<String, Object> connectionView(Connection connection);
 }

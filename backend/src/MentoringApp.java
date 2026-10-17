@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 
 /**
@@ -50,6 +51,7 @@ public class MentoringApp {
         // ProfileData interface, per ADR-001.
         ProfileData data = new InMemoryProfileData(sharedCore);
         EditProfile editProfile = new EditProfile();
+        ConnectionService connectionService = new ConnectionService(data);
 
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         // Longest matching prefix wins, so /mentors/profile is reached before /mentors.
@@ -75,6 +77,8 @@ public class MentoringApp {
                 studentProfile(exchange, sharedCore, data, editProfile)));
         server.createContext("/mentors", route(exchange ->
                 mentorDirectory(exchange, sharedCore, data)));
+        server.createContext("/connections", route(exchange ->
+                connections(exchange, sharedCore, data, connectionService)));
         server.createContext("/enums", route(MentoringApp::enums));
         server.createContext("/health", route(MentoringApp::health));
         server.createContext("/", route(exchange -> staticFile(exchange, staticDir)));
@@ -84,9 +88,9 @@ public class MentoringApp {
         System.out.println("Mentor Matching listening on port " + port);
         System.out.println("  static files: " + staticDir);
         System.out.println("  shared core:  " + (sharedCore.isStub()
-                ? "STUB MODE - no SHARED_CORE_URL set; remove before Sprint 2"
+                ? "STUB MODE - no SHARED_CORE_URL set; demo and test use only"
                 : sharedCoreUrl));
-        System.out.println("  storage:      in memory for Sprint 1; DB_URL="
+        System.out.println("  storage:      in memory (resets on restart); DB_URL="
                 + (dbUrl.isEmpty() ? "(unset)" : dbUrl));
         if (sharedCore.isStub()) {
             System.out.println("  stub tokens:  mentor-demo, student-demo, <uuid>:<Role>");
@@ -163,6 +167,70 @@ public class MentoringApp {
             throw ApiException.fields(errors);
         }
         respond(exchange, 200, data.listMentors(industry, guidance, withCapacityOnly, page, size));
+    }
+
+    /**
+     * Everything under {@code /connections}:
+     * <ul>
+     *   <li>{@code POST /connections} — a student sends a request
+     *   <li>{@code GET /connections} — the caller's connections, newest first
+     *   <li>{@code GET /connections/{id}} — one connection, for either participant
+     *   <li>{@code PUT /connections/{id}} — accept, decline, withdraw, complete, or edit notes
+     *   <li>{@code GET /connections/recommendations/{userId}} — the SOW path for
+     *       recommendations; same result as {@code GET /mentors/recommendations}
+     * </ul>
+     */
+    private static void connections(HttpExchange exchange, SharedCoreClient sharedCore,
+            ProfileData data, ConnectionService service) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String method = exchange.getRequestMethod();
+        SharedCoreClient.Principal caller = authenticate(exchange, sharedCore);
+
+        if (path.equals("/connections")) {
+            switch (method) {
+                case "POST" -> {
+                    requireRole(caller, "Student");
+                    respond(exchange, 201, service.request(caller.userId(), readBody(exchange)));
+                }
+                case "GET" -> respond(exchange, 200, service.listFor(caller.userId()));
+                default -> throw ApiException.methodNotAllowed("use POST or GET");
+            }
+            return;
+        }
+
+        String rest = path.substring("/connections/".length());
+        if (rest.startsWith("recommendations/")) {
+            requireRole(caller, "Student");
+            if (!method.equals("GET")) {
+                throw ApiException.methodNotAllowed("use GET");
+            }
+            UUID studentId = pathId(rest.substring("recommendations/".length()), path);
+            if (!studentId.equals(caller.userId())) {
+                throw ApiException.forbidden("students can only see their own recommendations");
+            }
+            respond(exchange, 200, data.rankMentors(data.findStudent(studentId)));
+            return;
+        }
+
+        UUID connectionId = pathId(rest, path);
+        switch (method) {
+            case "GET" -> respond(exchange, 200, service.view(caller.userId(), connectionId));
+            case "PUT" -> respond(exchange, 200,
+                    service.update(caller.userId(), connectionId, readBody(exchange)));
+            default -> throw ApiException.methodNotAllowed("use GET or PUT");
+        }
+    }
+
+    /** One id path segment; anything else is a route we do not have. */
+    private static UUID pathId(String segment, String path) {
+        if (segment.isEmpty() || segment.contains("/")) {
+            throw ApiException.notFound("no route for " + path);
+        }
+        try {
+            return UUID.fromString(segment);
+        } catch (IllegalArgumentException e) {
+            throw ApiException.notFound("no route for " + path);
+        }
     }
 
     /**
