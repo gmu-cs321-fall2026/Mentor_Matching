@@ -1,0 +1,5 @@
+Asked: Add a place on the student profile page to show recommended mentors, with a button to find them.
+
+Produced: A “Recommended mentors” section in studentprofile.html with a “Find my mentors” button, a status line, and an empty table with columns for mentor, industry, guidance, match, capacity, and a button column.
+
+Changed or rejected: Removed the hint text it first added under the heading, since the other sections don’t have one for this. Left the table hidden until app.js fills it in. Did not touch the existing profile form.
