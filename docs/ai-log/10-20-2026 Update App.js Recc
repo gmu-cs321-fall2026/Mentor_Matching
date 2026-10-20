@@ -1,0 +1,5 @@
+Asked: Connect the recommended mentors list to connection requests on the student page for Story 4, so a student can see ranked mentors and request one.
+
+Produced: A “Recommended mentors” table in studentprofile.html and two functions in app.js. loadRecommendations() fills the table, and requestConnection() sends the request with a “Request to connect” button.
+
+Changed or rejected: Rejected the test it wrote, because this commit is only the UI change. Cut its long comments down to one. Left the backend alone, since the recommendations endpoint already returns what the table needs.
