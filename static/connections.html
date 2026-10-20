@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connections — Mentor Matching</title>
+  <!-- If your other pages share a stylesheet, link it here and delete the <style> block. -->
+  <style>
+    :root { color-scheme: light dark; --line: #8886; --accent: #1d5fa8; --bad: #b3261e; --ok: #1b7a3e; }
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+    h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+    nav a { margin-right: 1rem; }
+    .bar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin: 1rem 0; }
+    label { display: grid; gap: .2rem; font-size: .9rem; }
+    input, select, textarea, button { font: inherit; padding: .35rem .5rem; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    #token { min-width: 20rem; }
+    #status { min-height: 1.5rem; }
+    #status.ok { color: var(--ok); }
+    #status.bad { color: var(--bad); }
+    .item { border: 1px solid var(--line); border-radius: 6px; padding: .75rem 1rem; margin: .5rem 0; }
+    .item h3 { font-size: 1rem; margin: 0; }
+    .meta { font-size: .9rem; opacity: .8; margin: .15rem 0 .5rem; }
+    .row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .5rem; }
+    .row textarea, .row input[type=text] { flex: 1 1 14rem; }
+    .badge { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0 .6rem; font-size: .85rem; }
+    .badge.full { color: var(--bad); border-color: var(--bad); }
+    .badge.ACTIVE { color: var(--ok); border-color: var(--ok); }
+    .badge.DECLINED, .badge.WITHDRAWN { color: var(--bad); border-color: var(--bad); }
+    .msg { font-size: .9rem; min-height: 1.2rem; margin: .4rem 0 0; }
+    .msg.bad { color: var(--bad); }
+    .msg.ok { color: var(--ok); }
+    .empty { opacity: .75; }
+  </style>
+</head>
+<body data-page="connections">
+  <nav><a href="/">Home</a></nav>
+  <h1>Connections</h1>
+  <p>Sign in with a token, then request a mentor or manage the connections you already have.</p>
+
+  <div class="bar">
+    <label>Token
+      <input id="token" type="text" value="student-demo" autocomplete="off">
+    </label>
+    <label>I am a
+      <select id="role">
+        <option value="Student">Student</option>
+        <option value="Mentor">Mentor</option>
+      </select>
+    </label>
+    <button id="refresh">Load my connections</button>
+  </div>
+  <div id="status" role="status"></div>
+
+  <section id="recommended-section">
+    <h2>Recommended mentors</h2>
+    <p class="meta">Mentors with room, best match first. Students only.</p>
+    <button id="load-recs">Load recommendations</button>
+    <div id="recs"></div>
+  </section>
+
+  <section>
+    <h2>My connections</h2>
+    <div id="connections"></div>
+  </section>
+
+  <script src="connections.js"></script>
+</body>
+</html>
