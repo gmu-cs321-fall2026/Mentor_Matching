@@ -321,6 +321,65 @@ function cell(text) {
   return td;
 }
 
+/** Loads ranked mentors and lets the student request a connection with one. */
+async function loadRecommendations() {
+  const status = el('recommend-status');
+  status.textContent = 'Loading…';
+  const result = await call('GET', '/mentors/recommendations');
+
+  if (!result.ok) {
+    const payload = result.payload || {};
+    status.textContent = (payload.error || 'Could not load recommendations') + ' (' + result.status + ')';
+    el('recommendations').hidden = true;
+    return;
+  }
+
+  const mentors = result.payload;
+  const body = el('recommendations').querySelector('tbody');
+  body.innerHTML = '';
+
+  mentors.forEach((mentor) => {
+    const row = document.createElement('tr');
+    row.appendChild(cell(mentor.name || mentor.userId));
+    row.appendChild(cell(mentor.industry ? pretty(mentor.industry) : '—'));
+    row.appendChild(cell((mentor.guidanceAreas || []).map(pretty).join(', ') || '—'));
+    row.appendChild(cell(Math.round(mentor.compatibilityScore * 100) + '%'));
+    row.appendChild(cell(mentor.activeMentees + ' / ' + mentor.maxMentees));
+
+    const action = document.createElement('td');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secondary';
+    button.textContent = 'Request to connect';
+    button.addEventListener('click', () => requestConnection(mentor.userId, button));
+    action.appendChild(button);
+    row.appendChild(action);
+
+    body.appendChild(row);
+  });
+
+  status.textContent = mentors.length ? '' : 'No mentors match your profile yet.';
+  el('recommendations').hidden = mentors.length === 0;
+}
+
+async function requestConnection(mentorId, button) {
+  button.disabled = true;
+  const label = button.textContent;
+  button.textContent = 'Requesting…';
+
+  const result = await call('POST', '/connections', { mentorId });
+
+  if (result.ok) {
+    button.textContent = 'Requested';
+    return;
+  }
+  button.disabled = false;
+  button.textContent = label;
+  const payload = result.payload || {};
+  el('recommend-status').textContent =
+    (payload.error || 'Could not send the request') + ' (' + result.status + ')';
+}
+
 /* ---------- wiring ---------- */
 
 el('load').addEventListener('click', loadProfile);
@@ -331,6 +390,10 @@ if (page === 'mentor') {
   el('browse').addEventListener('click', () => browse(1));
   el('prev').addEventListener('click', () => browse(directoryPage - 1));
   el('next').addEventListener('click', () => browse(directoryPage + 1));
+}
+
+if (page === 'student') {
+  el('recommend').addEventListener('click', loadRecommendations);
 }
 
 loadEnums();
