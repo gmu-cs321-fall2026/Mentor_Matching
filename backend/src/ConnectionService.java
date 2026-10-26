@@ -139,19 +139,20 @@ public class ConnectionService {
         if (notes != null && activeBefore) {
             connection.setNotes((String) notes);
         }
+        boolean wasActive = connection.getStatus() == ConnectionStatus.ACTIVE;
         if (changesStatus) {
-            ConnectionStatus from = connection.getStatus();
+            connection.moveTo(next, userId);
             if (next == ConnectionStatus.ACTIVE) {
                 mentor.setActiveMentees(mentor.getActiveMentees() + 1);
-                data.updateMentor(mentor);
-            } else if (from == ConnectionStatus.ACTIVE) {
+            } else if (wasActive) {
                 mentor.setActiveMentees(Math.max(0, mentor.getActiveMentees() - 1));
-                data.updateMentor(mentor);
             }
-            connection.moveTo(next, userId);
         }
         if (notes != null && !activeBefore) {
             connection.setNotes((String) notes);
+        }
+        if (changesStatus && (next == ConnectionStatus.ACTIVE || wasActive)) {
+            data.updateMentor(mentor);
         }
         return data.updateConnection(connection);
     }
