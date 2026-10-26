@@ -197,7 +197,11 @@ public class MentoringApp {
             }
             return;
         }
-
+        
+        if (!path.startsWith("/connections/")) {
+            throw ApiException.notFound("no route for " + path);
+        }
+    
         String rest = path.substring("/connections/".length());
         if (rest.startsWith("recommendations/")) {
             requireRole(caller, "Student");
