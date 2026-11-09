@@ -10,7 +10,7 @@
 
 <header>
   <h1>Mentor Matching</h1>
-  <p>Mason CareerLaunch &middot; Subsystem 4 &middot; Sprint 1 walking skeleton</p>
+  <p>Mason CareerLaunch &middot; Subsystem 4 &middot; Sprint 3</p>
 </header>
 
 <main>
@@ -25,11 +25,15 @@
       <a href="studentprofile.html">Student matching profile</a> — the industries, roles and guidance
       you are looking for.
     </p>
+    <p>
+      <a href="connections.html">Connections</a> — students request a recommended mentor; mentors
+      accept or decline; either side completes or ends an active connection and keeps shared notes.
+    </p>
   </section>
 
   <section>
     <h2>Endpoints</h2>
-    <p class="hint">Interface contracts v1 are on the project wiki; this is the summary.</p>
+    <p class="hint">Interface contracts v1 and v2 are on the project wiki; this is the summary.</p>
     <table>
       <thead><tr><th>Method and path</th><th>Role</th><th>Purpose</th></tr></thead>
       <tbody>
@@ -40,6 +44,12 @@
         <tr><td>GET /students/match-profile</td><td>Student</td><td>Read your own matching profile</td></tr>
         <tr><td>PUT /students/match-profile</td><td>Student</td><td>Update your own matching profile</td></tr>
         <tr><td>GET /mentors</td><td>Any signed in</td><td>Paginated, filterable mentor directory</td></tr>
+        <tr><td>GET /mentors/recommendations</td><td>Student</td><td>Your ranked mentor recommendations</td></tr>
+        <tr><td>GET /connections/recommendations/{userId}</td><td>Student</td><td>Same, at the SOW path; {userId} must be you</td></tr>
+        <tr><td>POST /connections</td><td>Student</td><td>Send a connection request to a mentor</td></tr>
+        <tr><td>GET /connections</td><td>Any signed in</td><td>Your connections, newest first</td></tr>
+        <tr><td>GET /connections/{id}</td><td>Either participant</td><td>One connection</td></tr>
+        <tr><td>PUT /connections/{id}</td><td>Either participant</td><td>Accept, decline, withdraw, complete, or edit shared notes</td></tr>
         <tr><td>GET /enums</td><td>Public</td><td>Agreed Industry, GuidanceArea and ContactMethod values</td></tr>
         <tr><td>GET /health</td><td>Public</td><td>Liveness check for compose and the gateway</td></tr>
       </tbody>
