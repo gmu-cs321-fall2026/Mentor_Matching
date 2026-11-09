@@ -1,5 +1,30 @@
 # Mentor Matching (Subsystem 4) — the whole subsystem as one container.
 # Builds and runs with nothing but `docker build` and `docker run`.
+#
+# Stages:
+#   test   `docker build --target test .` compiles and runs the JUnit tests with
+#          Gradle inside the container. CI runs it on every PR. A plain
+#          `docker build` skips it, so the image still builds without Gradle.
+#   build  compiles the service with javac.
+#   (last) the runtime image.
+
+# ---- Test stage ----
+# Full JDK on Ubuntu rather than Alpine: Gradle's native helpers expect glibc.
+FROM eclipse-temurin:21-jdk AS test
+
+WORKDIR /app
+
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle ./gradle
+# A Windows checkout can leave CRLF line endings in gradlew, which breaks it here.
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
+
+# Download Gradle and the test dependencies in their own layer, so changing a
+# source file does not download them again.
+RUN ./gradlew --no-daemon dependencies > /dev/null
+
+COPY backend ./backend
+RUN ./gradlew --no-daemon build
 
 # ---- Build stage ----
 FROM eclipse-temurin:21-jdk-alpine AS build

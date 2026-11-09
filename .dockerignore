@@ -1,0 +1,12 @@
+# Keep the build context small and free of host build output.
+.git
+.github
+.gradle
+.idea
+.vscode
+build
+out
+bin
+docs
+reviews
+*.class

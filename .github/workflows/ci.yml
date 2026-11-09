@@ -26,3 +26,36 @@ jobs:
 
       - name: Build and test
         run: ./gradlew build
+
+  docker-build-and-test:
+    name: docker-build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Run the JUnit tests inside the container
+        run: docker build --target test -t mentor-matching-test .
+
+      - name: Build the runtime image
+        run: docker build -t mentor-matching .
+
+      - name: Start the container
+        run: |
+          docker run -d --name mentor-matching -p 8080:8080 mentor-matching
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "Service is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Service did not answer /health within 30s"
+          exit 1
+
+      - name: Smoke test the running container
+        run: sh scripts/smoke-test.sh http://localhost:8080
+
+      - name: Show container logs
+        if: always()
+        run: docker logs mentor-matching || true

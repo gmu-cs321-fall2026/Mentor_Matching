@@ -8,7 +8,7 @@ This service handles mentor and student matching profiles, ranked mentor recomme
 - **Frontend:** plain HTML and JavaScript, served by the same process on one port
 - **Architecture:** [docs/architecture.md](docs/architecture.md) · decisions in [docs/adr/](docs/adr/) · contracts in [v1](docs/interface-contracts-v1.md) (profiles, directory) and [v2](docs/interface-contracts-v2.md) (recommendations, connections)
 - **Sprint 3 plan and retro:** [docs/sprint3.md](docs/sprint3.md)
-- **CI:** every pull request into `main` runs `./gradlew build` ([workflow](.github/workflows/ci.yml)); the `lint-and-test` check must pass before merging
+- **CI:** every pull request into `main` runs two checks ([workflow](.github/workflows/ci.yml)). `lint-and-test` runs `./gradlew build`. `docker-build-and-test` runs the JUnit tests inside the container, builds the image, starts it and runs [the smoke test](scripts/smoke-test.sh). Both must pass before merging
 
 Meeting weekly Friday @ 4:30pm for sync meetings.
 
@@ -37,7 +37,18 @@ Then open <http://localhost:8080/>. The mentor and student forms and the connect
 gradlew.bat build      # Windows
 ```
 
-This compiles `backend/src`, runs the JUnit tests in `backend/test` and is exactly what CI runs. No Gradle install is needed; the wrapper downloads it.
+This compiles `backend/src` and runs the JUnit tests in `backend/test`, the same as the `lint-and-test` check. No Gradle install is needed; the wrapper downloads it.
+
+What the `docker-build-and-test` check runs:
+
+```bash
+docker build --target test .                      # JUnit tests inside the container
+docker build -t mentor-matching .
+docker run -d --name mentor-matching -p 8080:8080 mentor-matching
+sh scripts/smoke-test.sh http://localhost:8080    # pages, auth and one connection lifecycle
+```
+
+The smoke test needs a fresh service in stub mode, because it creates the demo profiles. It also works against `java -cp out MentoringApp`.
 
 ## Configuration
 
@@ -102,9 +113,10 @@ docs/
   sprint3.md                 Sprint 3 plan and retro
   adr/                       Architecture decision records
   ai-log/                    AI prompt logs
-.github/workflows/ci.yml  CI check run on every PR
+.github/workflows/ci.yml  CI checks run on every PR
+scripts/smoke-test.sh     Smoke test against a running service
 build.gradle       Build and test configuration
-Dockerfile         Builds and runs the whole subsystem
+Dockerfile         Builds and runs the whole subsystem; its `test` stage runs the JUnit tests
 ```
 
 ### Where things live
