@@ -1,0 +1,5 @@
+# Shell scripts run inside Linux containers and CI, so they must keep LF endings
+# even in a Windows checkout.
+gradlew   text eol=lf
+*.sh      text eol=lf
+*.bat     text eol=crlf
