@@ -1,4 +1,4 @@
-# Mentor Matching — Sprint 3
+# Mentor Matching — Sprint 3 (closed)
 
 Mentor Matching subsystem (Subsystem 4) for Mason CareerLaunch.
 
@@ -28,7 +28,7 @@ mkdir -p out && javac -d out $(find backend/src -name "*.java")
 java -cp out MentoringApp
 ```
 
-Then open <http://localhost:8080/>. The mentor and student forms are linked from there.
+Then open <http://localhost:8080/>. The mentor and student forms and the connections page are linked from there.
 
 ## Build and test
 
@@ -78,14 +78,16 @@ Tokens it accepts:
 - Ranked recommendations from `MentorMatcher` (`GET /mentors/recommendations`)
 - Gradle build, JUnit tests and a GitHub Actions check required on every PR into `main`
 
-**Sprint 3 — in progress**
+**Sprint 3 — done** ([plan and retro](docs/sprint3.md))
 
 - Connection requests and their lifecycle: pending → active → completed, or declined / withdrawn (`/connections`, [contracts v2](docs/interface-contracts-v2.md))
 - A mentor's `activeMentees` now follows their active connections, so capacity in matching and the directory is real
 - The SOW recommendations path, `GET /connections/recommendations/{userId}`
 - Shared notes on an active connection
+- Connections page (`static/connections.html`): students request a recommended mentor, mentors accept or decline, either side completes or ends a connection and keeps shared notes
+- Recommended mentors on the student profile page
 
-**Not started:** session scheduling, notifications to Subsystem 8, UI for connections.
+**Not started:** session scheduling, notifications to Subsystem 8.
 
 ## Layout
 
@@ -109,8 +111,9 @@ Dockerfile         Builds and runs the whole subsystem
 
 | File | Layer | Responsibility |
 | - | - | - |
-| `static/*.html` | Presentation | Forms for each profile type |
+| `static/*.html` | Presentation | Forms for each profile type, plus the connections page |
 | `static/app.js` | Presentation | Calls our endpoints, renders results and field errors |
+| `static/connections.js` | Presentation | Connections page: request, accept/decline, complete/withdraw, shared notes |
 | `MentoringApp.java` | API | Starts the server, defines routes, validates tokens and input |
 | `ProfileBinding.java` | API | Request JSON to domain objects, one message per bad field |
 | `ApiException.java` | API | The shared `{error, code, detail}` format |
@@ -131,5 +134,4 @@ Dockerfile         Builds and runs the whole subsystem
 
 - **Everything resets on restart,** because storage is in memory until the attribute split with Shared Core is settled (ADR-001). That now includes connections.
 - **Stub mode is still on by default** (see above).
-- **No UI for connections yet;** the endpoints are usable with any HTTP client.
 - **`Industry` values are placeholders** pending sign-off with Shared Core and Subsystems 2 and 8.

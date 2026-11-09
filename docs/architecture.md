@@ -164,6 +164,7 @@ The layering is unchanged; the new files slot into the existing layers.
 
 | File | Layer | Responsibility |
 | - | - | - |
+| `connections.html`, `connections.js` | Presentation | Students request a recommended mentor; mentors accept or decline; either side completes or ends a connection and edits shared notes. Offers only the buttons the role could use; the service still enforces every rule |
 | `ConnectionService.java` | API / controller | Backs `POST` and `PUT /connections`: checks which side may make a move, keeps the mentor's `activeMentees` in step, and checks everything before changing anything so a rejected request leaves no partial change |
 | `Connection.java` | Domain | One request: the two user ids, status, message, shared notes, timestamps; owns the lifecycle table |
 | `ConnectionStatus.java` | Domain | `PENDING`, `ACTIVE`, `DECLINED`, `COMPLETED`, `WITHDRAWN` |
@@ -190,6 +191,7 @@ Design rules:
 - **Capacity is checked twice:** when the request is sent and again when the mentor accepts, since other requests may have filled the mentor in between. A full mentor gets a `409`, not an over-allocation.
 - **One open connection per student-mentor pair.** A student can ask again once the earlier request is closed.
 - **Not-on-it reads as not-found.** A user who is not a participant gets `404`, so connection ids cannot be probed.
+- **API routes and pages share a prefix.** The JDK server matches contexts by prefix, so the `/connections` context also receives `/connections.html` and `/connections.js`. Only `/connections` and `/connections/...` are API routes; anything else under that prefix is served as a static file. Keep this in mind when naming new pages.
 - **Capacity changes are serialized** (`synchronized` in `ConnectionService`). That is enough for the in-memory store; a database implementation needs a transaction around the connection and mentor updates.
 
 ### Risks added in Sprint 3

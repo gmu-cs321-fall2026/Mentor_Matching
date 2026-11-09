@@ -77,8 +77,17 @@ public class MentoringApp {
                 studentProfile(exchange, sharedCore, data, editProfile)));
         server.createContext("/mentors", route(exchange ->
                 mentorDirectory(exchange, sharedCore, data)));
-        server.createContext("/connections", route(exchange ->
-                connections(exchange, sharedCore, data, connectionService)));
+        // Contexts match by prefix, so this one also receives /connections.html and
+        // /connections.js. Only /connections and /connections/... are API routes;
+        // anything else that merely shares the prefix is a static file.
+        server.createContext("/connections", route(exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            if (path.equals("/connections") || path.startsWith("/connections/")) {
+                connections(exchange, sharedCore, data, connectionService);
+            } else {
+                staticFile(exchange, staticDir);
+            }
+        }));
         server.createContext("/enums", route(MentoringApp::enums));
         server.createContext("/health", route(MentoringApp::health));
         server.createContext("/", route(exchange -> staticFile(exchange, staticDir)));
