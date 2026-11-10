@@ -21,14 +21,14 @@ Team members: Dillon Bajracharya, Jacob Livermon, Noah Carter, Rohan Veeranki, [
 | - | - | - | - |
 | CI runs the JUnit tests inside the container (`Dockerfile` `test` stage, `docker-build-and-test` job) | TBD | Rohan | Done (PR #14) |
 | Smoke test against the running container: pages, auth, one connection lifecycle (`scripts/smoke-test.sh`) | TBD | Rohan | Done (PR #14) |
-| Branch protection on `main`: PRs only, `lint-and-test` and `docker-build-and-test` required | TBD | Rohan | [ ] confirm in Settings → Branches |
+| Branch protection on `main`: PRs only, `lint-and-test` and `docker-build-and-test` required | TBD | Rohan | Done |
 | Code-quality section in the retro | TBD | Rohan | Done (this file) |
-| Fix a defect from the Q&I quality report (carried over from Sprint 3) | TBD | TBD | **Open** |
+| Fix a defect from the Q&I quality report (carried over from Sprint 3) | TBD | TBD | **Blocked:** no Q&I defects filed against Mentor Matching (GitHub Issues checked Nov 9) |
 
 ### Agreements carried over from the Sprint 3 retro
 
 - [x] Add `docker build` and a smoke test to CI. The smoke test requests every page, including `/connections.html` and `/connections.js`. Against the code from before the Sprint 3 fix it fails with exactly those 401s.
-- [ ] Turn on branch protection for `main`
+- [x] Turn on branch protection for `main`
 - [ ] Each PR that changes a page or route says how it was tried in the running service. CI now covers the pages and the connection flow automatically, so this mainly matters for new pages and routes.
 - [ ] Estimate, assign and describe every Jira ticket at planning (Cross Review 2)
 
@@ -82,8 +82,8 @@ Measured on `main` after PR #14. Coverage comes from JaCoCo, applied through a t
 | Tests passing on `main` | 26 / 26 | [ ] |
 | Smoke test checks | 0 | 26 |
 | PRs merged into `main` | — | [ ] (#14 so far) |
-| CI runs that failed, and why | — | [ ] from the Actions tab |
-| Q&I defects reported / fixed | [ ] | [ ] |
+| CI runs that failed, and why | — | 0 of 4 so far (PRs #13 and #14 and their merges) |
+| Q&I defects reported / fixed | 0 / 0 | [ ] (none filed as GitHub Issues as of Nov 9) |
 | Open bugs in Jira | [ ] | [ ] |
 
 ## Retrospective
