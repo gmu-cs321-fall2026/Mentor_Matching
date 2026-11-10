@@ -6,6 +6,10 @@
  * buttons that role could plausibly use and shows whatever error comes back.
  * (Contracts v2: /mentors/recommendations and /connections.)
  *
+ * Mentor Matching does not provide messaging. An active connection shows an
+ * email button for the other person; conversations happen over email or
+ * another tool they choose.
+ *
  * app.js is wired to the profile forms and would fail on this page, so the small
  * helpers (call, pretty, el) are repeated here rather than imported.
  */
@@ -238,6 +242,8 @@ function connectionCard(connection) {
   }
 
   if (connection.status === 'ACTIVE') {
+    card.appendChild(contactLine(connection, isMentor));
+
     const row = make('div', undefined, 'row');
     const notes = document.createElement('textarea');
     notes.rows = 3;
@@ -261,6 +267,26 @@ function connectionCard(connection) {
 
   card.appendChild(msg);
   return card;
+}
+
+/**
+ * Email button for the other person on an active connection. The service only
+ * sends studentEmail and mentorEmail while the connection is ACTIVE.
+ */
+function contactLine(connection, isMentor) {
+  const email = isMentor ? connection.studentEmail : connection.mentorEmail;
+  const line = make('p', '', 'contact');
+  if (email) {
+    const link = make('a', 'Email ' + (isMentor ? 'your mentee' : 'your mentor'), 'email-button');
+    link.href = 'mailto:' + encodeURIComponent(email).replace('%40', '@')
+      + '?subject=' + encodeURIComponent('Mentor Matching');
+    link.title = email;
+    line.appendChild(link);
+    line.appendChild(make('span', ' ' + email, 'meta'));
+  }
+  line.appendChild(make('span',
+    ' Mentor Matching does not provide messaging; use email or a tool you both prefer.', 'meta'));
+  return line;
 }
 
 /* ---------- wiring ---------- */
