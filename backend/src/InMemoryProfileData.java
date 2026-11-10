@@ -271,14 +271,28 @@ final class InMemoryProfileData implements ProfileData {
         return items;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Emails come from Shared Core and are included only while the connection
+     * is {@code ACTIVE}: that is how the two people reach each other, since
+     * Mentor Matching does not provide messaging. A pending request does not
+     * reveal the student's email, and a closed connection stops sharing it.
+     */
     @Override
     public Map<String, Object> connectionView(Connection connection) {
+        Map<String, Object> student = sharedCore.getUser(connection.getStudentId());
+        Map<String, Object> mentor = sharedCore.getUser(connection.getMentorId());
+        boolean active = connection.getStatus() == ConnectionStatus.ACTIVE;
+
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("id", connection.getId().toString());
         view.put("studentId", connection.getStudentId().toString());
-        view.put("studentName", sharedCore.getUser(connection.getStudentId()).get("name"));
+        view.put("studentName", student.get("name"));
+        view.put("studentEmail", active ? student.get("email") : null);
         view.put("mentorId", connection.getMentorId().toString());
-        view.put("mentorName", sharedCore.getUser(connection.getMentorId()).get("name"));
+        view.put("mentorName", mentor.get("name"));
+        view.put("mentorEmail", active ? mentor.get("email") : null);
         view.put("status", connection.getStatus());
         view.put("message", connection.getMessage());
         view.put("notes", connection.getNotes());
