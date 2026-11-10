@@ -50,7 +50,7 @@ Numbers come from git history and `./gradlew build` on `main` at the end of the 
 
 | Metric | Start of sprint | End of sprint |
 | - | - | - |
-| JUnit tests | 5 | 26 (`MentorMatcherTest` 5, `ConnectionServiceTest` 16, `ConnectionTest` 5) |
+| JUnit tests | 5 | 26 (`ConnectionTest` 16, `ConnectionServiceTest` 5, `MentorMatcherTest` 5) |
 | Tests passing on `main` | 5 / 5 | 26 / 26 |
 | PRs merged into `main` | — | 11 (#1–#9, #11, #12), plus the sprint-close PR |
 | Members with merged commits this sprint | — | 4 (Dillon, Jacob, Noah, Rohan) |
