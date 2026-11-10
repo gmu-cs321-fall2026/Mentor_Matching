@@ -28,7 +28,7 @@ Team members: Dillon Bajracharya, Jacob Livermon, Noah Carter, Rohan Veeranki, [
 | Tests for the connection lifecycle rules (`ConnectionTest`) | TBD | Dillon | Done |
 | Validate `/connections` routes so unknown paths return `404` | TBD | Jacob | Done |
 | Fix: the connections page could not load (see defects below) | TBD | Rohan | Done |
-| Fix a defect from the Q&I quality report: [describe] | TBD | TBD | **Open** |
+| Fix a defect from the Q&I quality report | TBD | TBD | **Not done:** no Q&I defects were filed against Mentor Matching; carried into Sprint 4 |
 
 ### Defects fixed this sprint
 
@@ -50,12 +50,12 @@ Numbers come from git history and `./gradlew build` on `main` at the end of the 
 
 | Metric | Start of sprint | End of sprint |
 | - | - | - |
-| JUnit tests | 5 | 26 (`MentorMatcherTest` 5, `ConnectionServiceTest` 16, `ConnectionTest` 5) |
+| JUnit tests | 5 | 26 (`ConnectionTest` 16, `ConnectionServiceTest` 5, `MentorMatcherTest` 5) |
 | Tests passing on `main` | 5 / 5 | 26 / 26 |
 | PRs merged into `main` | — | 11 (#1–#9, #11, #12), plus the sprint-close PR |
 | Members with merged commits this sprint | — | 4 (Dillon, Jacob, Noah, Rohan) |
-| CI runs that failed, and why | — | [ ] from the Actions tab |
-| Q&I defects reported / fixed | [ ] | [ ] |
+| CI runs that failed, and why | — | 0 of 23 (Oct 17 – Oct 26, every PR and merge passed) |
+| Q&I defects reported / fixed | 0 / 0 | 0 / 0 (none filed as GitHub Issues) |
 | Defects found and fixed by the team | — | 2 (connections page blocked by the route prefix; script filename case) |
 | Open bugs in Jira | [ ] | [ ] |
 

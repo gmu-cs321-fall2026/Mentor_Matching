@@ -7,7 +7,7 @@ This service handles mentor and student matching profiles, ranked mentor recomme
 - **Backend:** Java 21, no runtime dependencies (see [ADR-004](docs/adr/ADR-004-java-framework.md)); Gradle and JUnit 5 for build and tests only
 - **Frontend:** plain HTML and JavaScript, served by the same process on one port
 - **Architecture:** [docs/architecture.md](docs/architecture.md) · decisions in [docs/adr/](docs/adr/) · contracts in [v1](docs/interface-contracts-v1.md) (profiles, directory) and [v2](docs/interface-contracts-v2.md) (recommendations, connections)
-- **Sprint 3 plan and retro:** [docs/sprint3.md](docs/sprint3.md)
+- **Sprint plans and retros:** [Sprint 3](docs/sprint3.md) · [Sprint 4](docs/sprint4.md) (includes the code-quality report)
 - **CI:** every pull request into `main` runs two checks ([workflow](.github/workflows/ci.yml)). `lint-and-test` runs `./gradlew build`. `docker-build-and-test` runs the JUnit tests inside the container, builds the image, starts it and runs [the smoke test](scripts/smoke-test.sh). Both must pass before merging
 
 Meeting weekly Friday @ 4:30pm for sync meetings.
@@ -111,6 +111,7 @@ docs/
   interface-contracts-v1.md  Profiles and directory
   interface-contracts-v2.md  Recommendations and connections
   sprint3.md                 Sprint 3 plan and retro
+  sprint4.md                 Sprint 4 plan, code quality and retro
   adr/                       Architecture decision records
   ai-log/                    AI prompt logs
 .github/workflows/ci.yml  CI checks run on every PR
