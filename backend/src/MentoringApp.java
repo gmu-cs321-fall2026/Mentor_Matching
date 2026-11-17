@@ -225,6 +225,24 @@ public class MentoringApp {
             return;
         }
 
+        // /connections/{id}/sessions: the session log
+        int slash = rest.indexOf('/');
+        if (slash >= 0) {
+            UUID connectionId = pathId(rest.substring(0, slash), path);
+            if (!rest.substring(slash + 1).equals("sessions")) {
+                throw ApiException.notFound("no route for " + path);
+            }
+            switch (method) {
+                case "GET" -> respond(exchange, 200,
+                        service.listSessions(caller.userId(), connectionId));
+                case "POST" -> respond(exchange, 201,
+                        service.logSession(caller.userId(), connectionId, readBody(exchange)));
+                default -> throw ApiException.methodNotAllowed("use GET or POST");
+            }
+            return;
+        }
+
+        // /connections/{id}: one connection
         UUID connectionId = pathId(rest, path);
         switch (method) {
             case "GET" -> respond(exchange, 200, service.view(caller.userId(), connectionId));
