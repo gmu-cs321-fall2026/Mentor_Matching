@@ -24,12 +24,15 @@ public class Connection {
 
     /** Longest request message or notes text we store. */
     public static final int MAX_TEXT_LENGTH = 2000;
+    /** Most session entries one connection will hold. */
+    public static final int MAX_SESSIONS = 200;
 
     private final UUID id;
     private final UUID studentId;
     private final UUID mentorId;
     private final String message;
     private final Instant createdAt;
+    private final List<SessionLogEntry> sessions = new CopyOnWriteArrayList<>();
 
     private ConnectionStatus status = ConnectionStatus.PENDING;
     private String notes = "";
@@ -119,6 +122,33 @@ public class Connection {
         }
         this.notes = checkText(notes, "notes");
         touch();
+    }
+
+    /** The session log, oldest first. The returned list is a read-only snapshot. */
+    public List<SessionLogEntry> getSessions() {
+        return Collections.unmodifiableList(new ArrayList<>(sessions));
+    }
+    
+    /**
+     * Records a session on an active connection.
+     *
+     * @throws IllegalStateException if the connection is not active or the log is full
+     * @throws IllegalArgumentException if the entry's values are invalid
+     */
+    public SessionLogEntry addSession(LocalDate heldOn, String summary, UUID authorId) {
+        if (status != ConnectionStatus.ACTIVE) {
+            throw new IllegalStateException("sessions can only be logged on an active connection");
+        }
+        if (!isParticipant(authorId)) {
+            throw new IllegalArgumentException("only the student or mentor can log a session");
+        }
+        if (sessions.size() >= MAX_SESSIONS) {
+            throw new IllegalStateException("this connection's session log is full");
+        }
+        SessionLogEntry entry = new SessionLogEntry(heldOn, summary, authorId);
+        sessions.add(entry);
+        touch();
+        return entry;
     }
 
     public Instant getCreatedAt() {
