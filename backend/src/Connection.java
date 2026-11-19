@@ -1,6 +1,11 @@
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.time.LocalDate;
 
 /**
  * Domain object for one student-to-mentor connection request and its lifecycle.
