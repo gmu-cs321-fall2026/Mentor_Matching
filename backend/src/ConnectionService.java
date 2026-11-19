@@ -3,6 +3,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 
 /**
  * Creates connection requests and moves them through their lifecycle.
@@ -21,6 +25,8 @@ public class ConnectionService {
 
     /** Fields a client may send to {@code PUT /connections/{id}}. */
     static final Set<String> UPDATE_FIELDS = Set.of("status", "notes");
+    /** Fields a client may send to {@code POST /connections/{id}/sessions}. */
+    static final Set<String> SESSION_FIELDS = Set.of("heldOn", "summary");
 
     private final ProfileData data;
 
@@ -154,7 +160,7 @@ public class ConnectionService {
         if (changesStatus && (next == ConnectionStatus.ACTIVE || wasActive)) {
             data.updateMentor(mentor);
         }
-        return data.updateConnection(connection);
+        return withSessions(data.updateConnection(connection), connection);
     }
 
     /**
@@ -163,12 +169,92 @@ public class ConnectionService {
      * @throws ApiException 404 if it does not exist or the caller is not on it
      */
     public Map<String, Object> view(UUID userId, UUID connectionId) {
-        return data.connectionView(findFor(userId, connectionId));
+        Connection connection = findFor(userId, connectionId);
+        return withSessions(data.connectionView(connection), connection);
     }
 
     /** Every connection the user is on, as student or mentor, newest first. */
     public List<Map<String, Object>> listFor(UUID userId) {
         return data.listConnections(userId);
+    }
+
+    /**
+     * Either participant records a session on an active connection.
+     *
+     * @param body {@code summary} (required) and {@code heldOn} as YYYY-MM-DD
+     *     (optional, defaults to today)
+     * @return the new entry
+     * @throws ApiException 400 for a bad body, 404 if the connection does not exist
+     *     or the caller is not on it, 409 if the connection is not active or its log is full
+     */
+    public synchronized Map<String, Object> logSession(UUID userId, UUID connectionId,
+            Map<String, Object> body) {
+        Connection connection = findFor(userId, connectionId);
+    
+        Map<String, String> errors = new LinkedHashMap<>();
+        for (String field : body.keySet()) {
+            if (!SESSION_FIELDS.contains(field)) {
+                errors.put(field, "not a field you can set here");
+            }
+        }
+        Object summary = body.get("summary");
+        if (summary == null) {
+            errors.put("summary", "required");
+        } else if (!(summary instanceof String)) {
+            errors.put("summary", "expected text");
+        }
+        LocalDate heldOn = LocalDate.now(ZoneOffset.UTC);
+        Object rawDate = body.get("heldOn");
+        if (rawDate != null) {
+            try {
+                heldOn = LocalDate.parse(String.valueOf(rawDate).trim());
+            } catch (DateTimeParseException e) {
+                errors.put("heldOn", "expected a date like 2026-11-17");
+            }
+        }
+        if (!errors.isEmpty()) {
+            throw ApiException.fields(errors);
+        }
+    
+        try {
+            return sessionView(connection.addSession(heldOn, (String) summary, userId));
+        } catch (IllegalArgumentException e) {
+            // Remaining complaints are about one field's value (too long, future date).
+            String field = e.getMessage().startsWith("heldOn") || e.getMessage().contains("future")
+                    ? "heldOn" : "summary";
+            throw ApiException.fields(Map.of(field, e.getMessage()));
+        } catch (IllegalStateException e) {
+            throw ApiException.conflict(e.getMessage());
+        }
+    }
+    
+    /** The session log for one connection, oldest first, for either participant. */
+    public List<Map<String, Object>> listSessions(UUID userId, UUID connectionId) {
+        return sessionViews(findFor(userId, connectionId));
+    }
+    
+    private static Map<String, Object> withSessions(Map<String, Object> view, Connection connection) {
+        Map<String, Object> copy = new LinkedHashMap<>(view);
+        copy.put("sessions", sessionViews(connection));
+        return copy;
+    }
+    
+    private static List<Map<String, Object>> sessionViews(Connection connection) {
+        List<Map<String, Object>> views = new ArrayList<>();
+        for (SessionLogEntry entry : connection.getSessions()) {
+            views.add(sessionView(entry));
+        }
+        return views;
+    }
+    
+    private static Map<String, Object> sessionView(SessionLogEntry entry) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("id", entry.getId());
+        view.put("heldOn", entry.getHeldOn());
+        view.put("summary", entry.getSummary());
+        view.put("loggedBy", entry.getLoggedBy());
+        view.put("loggedAt", entry.getLoggedAt());
+        return view;
     }
 
     /** 403 if the move belongs to the other side, 409 if it is not allowed or the mentor is full. */
