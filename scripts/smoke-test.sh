@@ -80,6 +80,19 @@ expect 200 "mentor profile after accept" -H "$MENTOR" "$BASE/mentors/profile"
 body_has "activeMentees is 1" '"activeMentees" *: *1'
 expect 200 "student saves shared notes" -X PUT "$BASE/connections/$ID" -H "$STUDENT" -H "$JSON" \
   -d '{"notes":"meet friday"}'
+# Session scheduling: the student proposes, can't confirm their own time, the mentor confirms.
+# GNU date (CI runners) first, then BSD date (macOS).
+WHEN="$(date -u -d '+2 days' +%Y-%m-%dT18:00:00Z 2>/dev/null || date -u -v+2d +%Y-%m-%dT18:00:00Z)"
+expect 201 "student proposes a session time" -X POST "$BASE/connections/$ID/schedule" -H "$STUDENT" -H "$JSON" \
+  -d "{\"startsAt\":\"$WHEN\",\"note\":\"Zoom\"}"
+PROPOSAL="$(grep -o '"id" *: *"[^"]*"' "$BODY" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+expect 403 "student cannot confirm their own proposal" -X PUT "$BASE/connections/$ID/schedule" \
+  -H "$STUDENT" -H "$JSON" -d "{\"proposalId\":\"$PROPOSAL\",\"status\":\"CONFIRMED\"}"
+expect 200 "mentor confirms the session time" -X PUT "$BASE/connections/$ID/schedule" \
+  -H "$MENTOR" -H "$JSON" -d "{\"proposalId\":\"$PROPOSAL\",\"status\":\"CONFIRMED\"}"
+body_has "schedule is CONFIRMED" '"status" *: *"CONFIRMED"'
+expect 200 "student sees the confirmed time" -H "$STUDENT" "$BASE/connections/$ID/schedule"
+body_has "confirmed time is the proposed one" "$WHEN"
 expect 200 "mentor completes" -X PUT "$BASE/connections/$ID" -H "$MENTOR" -H "$JSON" -d '{"status":"COMPLETED"}'
 expect 200 "mentor profile after complete" -H "$MENTOR" "$BASE/mentors/profile"
 body_has "activeMentees is back to 0" '"activeMentees" *: *0'

@@ -185,6 +185,9 @@ public class MentoringApp {
      *   <li>{@code GET /connections} — the caller's connections, newest first
      *   <li>{@code GET /connections/{id}} — one connection, for either participant
      *   <li>{@code PUT /connections/{id}} — accept, decline, withdraw, complete, or edit notes
+     *   <li>{@code GET|POST /connections/{id}/sessions} — the session log
+     *   <li>{@code GET|POST|PUT /connections/{id}/schedule} — propose, confirm or cancel
+     *       the next session's time
      *   <li>{@code GET /connections/recommendations/{userId}} — the SOW path for
      *       recommendations; same result as {@code GET /mentors/recommendations}
      * </ul>
@@ -225,19 +228,32 @@ public class MentoringApp {
             return;
         }
 
-        // /connections/{id}/sessions: the session log
+        // /connections/{id}/sessions (the session log) and /connections/{id}/schedule
         int slash = rest.indexOf('/');
         if (slash >= 0) {
             UUID connectionId = pathId(rest.substring(0, slash), path);
-            if (!rest.substring(slash + 1).equals("sessions")) {
-                throw ApiException.notFound("no route for " + path);
-            }
-            switch (method) {
-                case "GET" -> respond(exchange, 200,
-                        service.listSessions(caller.userId(), connectionId));
-                case "POST" -> respond(exchange, 201,
-                        service.logSession(caller.userId(), connectionId, readBody(exchange)));
-                default -> throw ApiException.methodNotAllowed("use GET or POST");
+            switch (rest.substring(slash + 1)) {
+                case "sessions" -> {
+                    switch (method) {
+                        case "GET" -> respond(exchange, 200,
+                                service.listSessions(caller.userId(), connectionId));
+                        case "POST" -> respond(exchange, 201,
+                                service.logSession(caller.userId(), connectionId, readBody(exchange)));
+                        default -> throw ApiException.methodNotAllowed("use GET or POST");
+                    }
+                }
+                case "schedule" -> {
+                    switch (method) {
+                        case "GET" -> respond(exchange, 200,
+                                service.viewSchedule(caller.userId(), connectionId));
+                        case "POST" -> respond(exchange, 201,
+                                service.proposeSession(caller.userId(), connectionId, readBody(exchange)));
+                        case "PUT" -> respond(exchange, 200,
+                                service.answerSchedule(caller.userId(), connectionId, readBody(exchange)));
+                        default -> throw ApiException.methodNotAllowed("use GET, POST or PUT");
+                    }
+                }
+                default -> throw ApiException.notFound("no route for " + path);
             }
             return;
         }

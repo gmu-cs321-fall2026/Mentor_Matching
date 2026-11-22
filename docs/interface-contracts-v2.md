@@ -84,9 +84,51 @@ Send `status`, `notes`, or both. A request that fails changes nothing.
 | `404` | no such connection, or the caller is not on it |
 | `409` | the move is not allowed from the current status, the mentor is full when accepting, or notes on a connection that is not active |
 
+## Session scheduling
+
+One participant proposes a time for the next session; the other confirms it. Mentor Matching does not book rooms or send invites: `note` says where or how to meet. There is at most one schedule per connection, and a new proposal replaces it (that is how a session is rescheduled). `GET /connections` and `GET /connections/{id}` include it as `schedule`, or `null`.
+
+| Method & path | Who | Purpose |
+| - | - | - |
+| `POST /connections/{id}/schedule` | Either participant | Propose a time (replaces any current one) |
+| `PUT /connections/{id}/schedule` | Either participant | `CONFIRMED` accepts it; `CANCELLED` withdraws, declines or cancels it |
+| `GET /connections/{id}/schedule` | Either participant | The current proposal or confirmed time |
+
+**`POST` body**
+
+| Field | Type | Rules |
+| - | - | - |
+| `startsAt` | string | required; ISO 8601 with an offset or `Z`, e.g. `2026-11-24T18:00:00-05:00`; in the future and within a year |
+| `note` | string | optional; max 500 chars |
+
+**`PUT` body**
+
+| Field | Type | Rules |
+| - | - | - |
+| `proposalId` | UUID | required; the proposal the caller is answering |
+| `status` | string | `CONFIRMED` or `CANCELLED` |
+
+**Response** (`201` from `POST`, `200` from `PUT` and `GET`; `PUT` with `CANCELLED` returns `null`)
+
+```json
+{
+  "id": "6f1c…", "startsAt": "2026-11-24T23:00:00Z", "note": "Zoom",
+  "status": "CONFIRMED", "proposedBy": "2222…", "proposedAt": "2026-11-20T15:00:00Z",
+  "confirmedBy": "1111…", "confirmedAt": "2026-11-20T16:10:00Z"
+}
+```
+
+| Error | When |
+| - | - |
+| `400` | missing or badly formatted `startsAt`, a time in the past or more than a year away, note too long, unknown field, bad `proposalId` or `status` |
+| `403` | confirming your own proposal |
+| `404` | no such connection, the caller is not on it, or (`GET`) nothing is scheduled |
+| `409` | the connection is not `ACTIVE`; nothing proposed; the proposal was replaced by a newer one; already confirmed; or its time has passed |
+
+When the connection leaves `ACTIVE`, an unconfirmed proposal is dropped and a confirmed one is kept read-only as a record.
+
 ## Open items before this goes on the wiki
 
 - **Notifications (Subsystem 8)** should hear about a new request and an accept or decline. Not wired yet; needs their contract.
-- **Session scheduling** is not built. The SOW's text-based proposal and confirm would sit on an active connection.
 - **Staff and admin access.** Today only the two participants can read a connection. Career Services Staff reporting on connections needs a route agreed with them.
 - **Confirm the `/connections` prefix with Shared Core** for the gateway, as with `/mentors` and `/students`.

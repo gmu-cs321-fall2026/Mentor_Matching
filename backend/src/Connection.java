@@ -42,6 +42,8 @@ public class Connection {
     private ConnectionStatus status = ConnectionStatus.PENDING;
     private String notes = "";
     private Instant updatedAt;
+    /** The next session's proposed or confirmed time; null when nothing is scheduled. */
+    private SessionProposal schedule;
 
     /**
      * A new pending request.
@@ -87,8 +89,95 @@ public class Connection {
         if (!isAllowed(status, next, isMentor(actorId))) {
             throw new IllegalStateException("cannot move from " + status + " to " + next);
         }
+        // A time nobody agreed to means nothing once the connection closes.
+        // A confirmed one is kept as a record of what was arranged.
+        if (schedule != null && schedule.getStatus() == SessionProposal.Status.PROPOSED) {
+            schedule = null;
+        }
         status = next;
         touch();
+    }
+
+    /** The next session's proposed or confirmed time, or null when nothing is scheduled. */
+    public SessionProposal getSchedule() {
+        return schedule;
+    }
+
+    /**
+     * Either participant proposes a time for the next session. A new proposal
+     * replaces whatever was there, proposed or confirmed: that is how a session
+     * is rescheduled.
+     *
+     * @throws IllegalStateException if the connection is not active
+     * @throws IllegalArgumentException if the caller is not on the connection
+     * @throws InvalidFieldException if the time or note is invalid
+     */
+    public SessionProposal proposeSchedule(Instant startsAt, String note, UUID by, Instant now) {
+        if (status != ConnectionStatus.ACTIVE) {
+            throw new IllegalStateException("sessions can only be scheduled on an active connection");
+        }
+        if (!isParticipant(by)) {
+            throw new IllegalArgumentException("only the student or mentor can propose a time");
+        }
+        schedule = new SessionProposal(startsAt, note, by, now);
+        touch();
+        return schedule;
+    }
+
+    /**
+     * The other participant agrees to the proposed time.
+     *
+     * @param proposalId the proposal the caller saw, so a stale page cannot
+     *     confirm a time that has since been replaced
+     * @throws IllegalCallerException if the caller made the proposal
+     * @throws IllegalStateException if the connection is not active, nothing is
+     *     proposed, the proposal was replaced or is already confirmed, or its
+     *     time has passed
+     */
+    public SessionProposal confirmSchedule(UUID proposalId, UUID by, Instant now) {
+        SessionProposal current = currentProposal(proposalId);
+        if (current.getStatus() == SessionProposal.Status.CONFIRMED) {
+            throw new IllegalStateException("this time is already confirmed");
+        }
+        if (current.getProposedBy().equals(by)) {
+            throw new IllegalCallerException("the other participant has to confirm your proposal");
+        }
+        if (!current.getStartsAt().isAfter(now)) {
+            throw new IllegalStateException("the proposed time has passed; propose a new one");
+        }
+        schedule = current.confirmedBy(by, now);
+        touch();
+        return schedule;
+    }
+
+    /**
+     * Either participant clears the schedule: the proposer withdraws their
+     * proposal, the other side declines it, or either side cancels a confirmed
+     * session.
+     *
+     * @throws IllegalStateException if the connection is not active, nothing is
+     *     scheduled, or the proposal was replaced
+     */
+    public void cancelSchedule(UUID proposalId, UUID by) {
+        currentProposal(proposalId);
+        if (!isParticipant(by)) {
+            throw new IllegalArgumentException("only the student or mentor can cancel a session");
+        }
+        schedule = null;
+        touch();
+    }
+
+    private SessionProposal currentProposal(UUID proposalId) {
+        if (status != ConnectionStatus.ACTIVE) {
+            throw new IllegalStateException("sessions can only be scheduled on an active connection");
+        }
+        if (schedule == null) {
+            throw new IllegalStateException("no session time has been proposed");
+        }
+        if (!schedule.getId().equals(proposalId)) {
+            throw new IllegalStateException("that proposal was replaced by a newer one; refresh and try again");
+        }
+        return schedule;
     }
 
     public UUID getId() {
