@@ -243,6 +243,7 @@ function connectionCard(connection) {
 
   if (connection.status === 'ACTIVE') {
     card.appendChild(contactLine(connection, isMentor));
+    card.appendChild(schedulePanel(connection, isMentor, other));
 
     const row = make('div', undefined, 'row');
     const notes = document.createElement('textarea');
@@ -264,9 +265,166 @@ function connectionCard(connection) {
   } else if (connection.notes) {
     card.appendChild(make('p', 'Notes: ' + connection.notes, 'meta'));
   }
+  if (connection.status !== 'ACTIVE' && connection.schedule && connection.schedule.status === 'CONFIRMED') {
+    card.appendChild(make('p', 'Last arranged session: ' + when(connection.schedule.startsAt), 'meta'));
+  }
 
   card.appendChild(msg);
   return card;
+}
+
+/* ---------- session scheduling ---------- */
+
+/** "Tue, Nov 24, 6:00 PM" in the viewer's own time zone. */
+function when(iso) {
+  return new Date(iso).toLocaleString([], {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
+
+/** Value for a datetime-local input, in local time: "2026-11-24T18:00". */
+function localInputValue(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate())
+    + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+}
+
+/**
+ * The "Next session" panel on an active connection. Four states:
+ *   nothing scheduled          -> Propose a time
+ *   I proposed, waiting        -> Propose a different time / Withdraw proposal
+ *   they proposed              -> Confirm / Suggest another time / Decline
+ *   confirmed                  -> Add to calendar / Reschedule / Cancel session
+ * The service enforces every rule (only the other side can confirm, the time
+ * must be in the future, a stale proposal is refused); this only picks buttons.
+ */
+function schedulePanel(connection, isMentor, other) {
+  const panel = make('div', undefined, 'schedule');
+  panel.appendChild(make('h4', 'Next session'));
+  const msg = make('p', '', 'msg');
+  const myId = isMentor ? connection.mentorId : connection.studentId;
+  const proposal = connection.schedule;
+  const url = '/connections/' + connection.id + '/schedule';
+
+  async function answer(status, doneText) {
+    setMsg(msg, 'Saving…');
+    const result = await call('PUT', url, { proposalId: proposal.id, status });
+    if (result.ok) {
+      setMsg(msg, doneText, 'ok');
+      loadConnections();
+    } else {
+      setMsg(msg, failureText(result), 'bad');
+    }
+  }
+
+  const summary = make('p', '', 'schedule-summary');
+  const actions = make('div', undefined, 'row');
+  const form = proposeForm(url, msg, proposal ? 'Send new time' : 'Send proposal');
+  form.hidden = true;
+  const openForm = (label) => button(label, () => {
+    form.hidden = false;
+    form.querySelector('input[type=datetime-local]').focus();
+  });
+
+  if (!proposal) {
+    summary.textContent = 'No session scheduled yet.';
+    actions.appendChild(openForm('Propose a time'));
+  } else if (proposal.status === 'PROPOSED' && proposal.proposedBy === myId) {
+    summary.append('You proposed ', make('strong', when(proposal.startsAt)),
+      '. Waiting for ' + other + ' to confirm.');
+    actions.appendChild(openForm('Propose a different time'));
+    actions.appendChild(button('Withdraw proposal', () => answer('CANCELLED', 'Proposal withdrawn.')));
+  } else if (proposal.status === 'PROPOSED') {
+    summary.append(other + ' proposed ', make('strong', when(proposal.startsAt)), '.');
+    const confirm = button('Confirm', () => answer('CONFIRMED', 'Confirmed. Both of you can see it here.'));
+    confirm.className = 'primary';
+    actions.appendChild(confirm);
+    actions.appendChild(openForm('Suggest another time'));
+    actions.appendChild(button('Decline', () => answer('CANCELLED', 'Declined. Either of you can propose a new time.')));
+  } else {
+    summary.append('Confirmed for ', make('strong', when(proposal.startsAt)), '.');
+    summary.classList.add('confirmed');
+    actions.appendChild(button('Add to calendar', () => downloadInvite(connection, proposal, other)));
+    actions.appendChild(openForm('Reschedule'));
+    actions.appendChild(button('Cancel session', () => answer('CANCELLED', 'Session cancelled.')));
+  }
+
+  panel.appendChild(summary);
+  if (proposal && proposal.note) {
+    panel.appendChild(make('p', 'Where / how: ' + proposal.note, 'meta'));
+  }
+  panel.appendChild(actions);
+  panel.appendChild(form);
+  panel.appendChild(msg);
+  return panel;
+}
+
+/** Date, time and an optional note; posts a new proposal (which replaces any old one). */
+function proposeForm(url, msg, submitLabel) {
+  const form = make('div', undefined, 'row propose');
+  const time = document.createElement('input');
+  time.type = 'datetime-local';
+  time.min = localInputValue(new Date());
+  time.setAttribute('aria-label', 'Session date and time');
+  const note = document.createElement('input');
+  note.type = 'text';
+  note.maxLength = 500;
+  note.placeholder = 'Where or how (Zoom link, Fenwick Library…)';
+  note.setAttribute('aria-label', 'Where or how to meet');
+
+  form.appendChild(time);
+  form.appendChild(note);
+  form.appendChild(button(submitLabel, async () => {
+    if (!time.value) {
+      setMsg(msg, 'Pick a date and time first.', 'bad');
+      return;
+    }
+    setMsg(msg, 'Sending…');
+    // datetime-local is the viewer's local time; send it as an exact instant.
+    const body = { startsAt: new Date(time.value).toISOString() };
+    if (note.value.trim()) {
+      body.note = note.value.trim();
+    }
+    const result = await call('POST', url, body);
+    if (result.ok) {
+      setMsg(msg, 'Proposal sent. It needs the other person to confirm.', 'ok');
+      loadConnections();
+    } else {
+      setMsg(msg, failureText(result), 'bad');
+    }
+  }));
+  form.appendChild(button('Cancel', () => {
+    form.hidden = true;
+    setMsg(msg, '');
+  }));
+  return form;
+}
+
+/** A one-hour .ics file for a confirmed session, so it lands in any calendar app. */
+function downloadInvite(connection, proposal, other) {
+  const stamp = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const start = new Date(proposal.startsAt);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const escape = (t) => t.replace(/[\\,;]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mason CareerLaunch//Mentor Matching//EN',
+    'BEGIN:VEVENT',
+    'UID:' + proposal.id + '@mentor-matching',
+    'DTSTAMP:' + stamp(new Date()),
+    'DTSTART:' + stamp(start),
+    'DTEND:' + stamp(end),
+    'SUMMARY:' + escape('Mentoring session with ' + other),
+  ];
+  if (proposal.note) {
+    lines.push('LOCATION:' + escape(proposal.note));
+  }
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/calendar' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'mentoring-session.ics';
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 /**

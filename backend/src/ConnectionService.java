@@ -3,7 +3,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -27,11 +30,22 @@ public class ConnectionService {
     static final Set<String> UPDATE_FIELDS = Set.of("status", "notes");
     /** Fields a client may send to {@code POST /connections/{id}/sessions}. */
     static final Set<String> SESSION_FIELDS = Set.of("heldOn", "summary");
+    /** Fields a client may send to {@code POST /connections/{id}/schedule}. */
+    static final Set<String> PROPOSE_FIELDS = Set.of("startsAt", "note");
+    /** Fields a client may send to {@code PUT /connections/{id}/schedule}. */
+    static final Set<String> ANSWER_FIELDS = Set.of("proposalId", "status");
 
     private final ProfileData data;
+    private final Clock clock;
 
     public ConnectionService(ProfileData data) {
+        this(data, Clock.systemUTC());
+    }
+
+    /** @param clock the time source for scheduling rules; tests pass a fixed clock */
+    public ConnectionService(ProfileData data, Clock clock) {
         this.data = data;
+        this.clock = clock;
     }
 
     /**
@@ -233,6 +247,129 @@ public class ConnectionService {
         return sessionViews(findFor(userId, connectionId));
     }
     
+    /**
+     * Either participant proposes a time for the next session.
+     *
+     * @param body {@code startsAt} (required, ISO 8601 with an offset, e.g.
+     *     {@code 2026-11-24T18:00:00-05:00}) and {@code note} (optional)
+     * @return the new proposal, status {@code PROPOSED}
+     * @throws ApiException 400 for a bad body, 404 if the connection does not exist
+     *     or the caller is not on it, 409 if the connection is not active
+     */
+    public synchronized Map<String, Object> proposeSession(UUID userId, UUID connectionId,
+            Map<String, Object> body) {
+        Connection connection = findFor(userId, connectionId);
+
+        Map<String, String> errors = unknownFields(body, PROPOSE_FIELDS);
+        Instant startsAt = null;
+        Object rawStart = body.get("startsAt");
+        if (rawStart == null) {
+            errors.put("startsAt", "required");
+        } else {
+            startsAt = parseInstant(String.valueOf(rawStart));
+            if (startsAt == null) {
+                errors.put("startsAt", "expected a date and time like 2026-11-24T18:00:00-05:00");
+            }
+        }
+        Object note = body.get("note");
+        if (note != null && !(note instanceof String)) {
+            errors.put("note", "expected text");
+        }
+        if (!errors.isEmpty()) {
+            throw ApiException.fields(errors);
+        }
+
+        try {
+            return connection.proposeSchedule(startsAt, (String) note, userId, clock.instant()).toView();
+        } catch (InvalidFieldException e) {
+            throw ApiException.fields(Map.of(e.getField(), e.getMessage()));
+        } catch (IllegalStateException e) {
+            throw ApiException.conflict(e.getMessage());
+        }
+    }
+
+    /**
+     * A participant answers the current proposal: {@code CONFIRMED} accepts it,
+     * {@code CANCELLED} withdraws, declines, or cancels it.
+     *
+     * @param body {@code proposalId} and {@code status}, both required
+     * @return the schedule after the change; {@code null} once cancelled
+     * @throws ApiException 400 for a bad body, 403 if the caller tries to confirm
+     *     their own proposal, 404 if the connection does not exist or the caller is
+     *     not on it, 409 if there is nothing to answer, the proposal was replaced or
+     *     already confirmed, its time has passed, or the connection is not active
+     */
+    public synchronized Map<String, Object> answerSchedule(UUID userId, UUID connectionId,
+            Map<String, Object> body) {
+        Connection connection = findFor(userId, connectionId);
+
+        Map<String, String> errors = unknownFields(body, ANSWER_FIELDS);
+        UUID proposalId = null;
+        Object rawId = body.get("proposalId");
+        if (rawId == null) {
+            errors.put("proposalId", "required");
+        } else {
+            try {
+                proposalId = UUID.fromString(String.valueOf(rawId).trim());
+            } catch (IllegalArgumentException e) {
+                errors.put("proposalId", "expected a proposal id");
+            }
+        }
+        String answer = body.get("status") == null ? null
+                : String.valueOf(body.get("status")).trim().toUpperCase();
+        if (!"CONFIRMED".equals(answer) && !"CANCELLED".equals(answer)) {
+            errors.put("status", "expected CONFIRMED or CANCELLED");
+        }
+        if (!errors.isEmpty()) {
+            throw ApiException.fields(errors);
+        }
+
+        try {
+            if (answer.equals("CONFIRMED")) {
+                return connection.confirmSchedule(proposalId, userId, clock.instant()).toView();
+            }
+            connection.cancelSchedule(proposalId, userId);
+            return null;
+        } catch (IllegalCallerException e) {
+            throw ApiException.forbidden(e.getMessage());
+        } catch (IllegalStateException e) {
+            throw ApiException.conflict(e.getMessage());
+        }
+    }
+
+    /**
+     * The current proposal or confirmed time, for either participant.
+     *
+     * @throws ApiException 404 if the connection does not exist, the caller is not
+     *     on it, or nothing is scheduled
+     */
+    public Map<String, Object> viewSchedule(UUID userId, UUID connectionId) {
+        SessionProposal schedule = findFor(userId, connectionId).getSchedule();
+        if (schedule == null) {
+            throw ApiException.notFound("no session is scheduled on this connection");
+        }
+        return schedule.toView();
+    }
+
+    private static Map<String, String> unknownFields(Map<String, Object> body, Set<String> allowed) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        for (String field : body.keySet()) {
+            if (!allowed.contains(field)) {
+                errors.put(field, "not a field you can set here");
+            }
+        }
+        return errors;
+    }
+
+    /** ISO 8601 with an offset or a Z; null when it is neither. */
+    private static Instant parseInstant(String text) {
+        try {
+            return OffsetDateTime.parse(text.trim()).toInstant();
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
     private static Map<String, Object> withSessions(Map<String, Object> view, Connection connection) {
         Map<String, Object> copy = new LinkedHashMap<>(view);
         copy.put("sessions", sessionViews(connection));

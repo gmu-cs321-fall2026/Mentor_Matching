@@ -296,6 +296,8 @@ final class InMemoryProfileData implements ProfileData {
         view.put("status", connection.getStatus());
         view.put("message", connection.getMessage());
         view.put("notes", connection.getNotes());
+        SessionProposal schedule = connection.getSchedule();
+        view.put("schedule", schedule == null ? null : schedule.toView());
         view.put("createdAt", connection.getCreatedAt().toString());
         view.put("updatedAt", connection.getUpdatedAt().toString());
         return view;
