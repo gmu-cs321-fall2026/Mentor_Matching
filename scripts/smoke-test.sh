@@ -80,6 +80,11 @@ expect 200 "mentor profile after accept" -H "$MENTOR" "$BASE/mentors/profile"
 body_has "activeMentees is 1" '"activeMentees" *: *1'
 expect 200 "student saves shared notes" -X PUT "$BASE/connections/$ID" -H "$STUDENT" -H "$JSON" \
   -d '{"notes":"meet friday"}'
+# Session log: either side records a session; both read it back.
+expect 201 "student logs a session" -X POST "$BASE/connections/$ID/sessions" -H "$STUDENT" -H "$JSON"   -d '{"summary":"smoke test session"}'
+expect 200 "mentor reads the session log" -H "$MENTOR" "$BASE/connections/$ID/sessions"
+body_has "session log has the entry" '"summary" *: *"smoke test session"'
+
 # Session scheduling: the student proposes, can't confirm their own time, the mentor confirms.
 # GNU date (CI runners) first, then BSD date (macOS).
 WHEN="$(date -u -d '+2 days' +%Y-%m-%dT18:00:00Z 2>/dev/null || date -u -v+2d +%Y-%m-%dT18:00:00Z)"

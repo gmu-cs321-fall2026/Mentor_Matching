@@ -1,13 +1,13 @@
-# Mentor Matching — Sprint 3 (closed)
+# Mentor Matching — Sprint 5 (feature freeze)
 
 Mentor Matching subsystem (Subsystem 4) for Mason CareerLaunch.
 
-This service handles mentor and student matching profiles, ranked mentor recommendations, and the connection requests that link a student to a mentor.
+This service handles mentor and student matching profiles, ranked mentor recommendations, and the connections that link a student to a mentor: requests, accept or decline, contact by email, a session log and session scheduling.
 
 - **Backend:** Java 21, no runtime dependencies (see [ADR-004](docs/adr/ADR-004-java-framework.md)); Gradle and JUnit 5 for build and tests only
 - **Frontend:** plain HTML and JavaScript, served by the same process on one port
 - **Architecture:** [docs/architecture.md](docs/architecture.md) · decisions in [docs/adr/](docs/adr/) · contracts in [v1](docs/interface-contracts-v1.md) (profiles, directory) and [v2](docs/interface-contracts-v2.md) (recommendations, connections)
-- **Sprint plans and retros:** [Sprint 3](docs/sprint3.md) · [Sprint 4](docs/sprint4.md) (includes the code-quality report)
+- **Sprint plans and retros:** [Sprint 1](docs/sprint1-retrospective.md) · [Sprint 3](docs/sprint3.md) · [Sprint 4](docs/sprint4.md) (includes the code-quality report)
 - **CI:** every pull request into `main` runs two checks ([workflow](.github/workflows/ci.yml)). `lint-and-test` runs `./gradlew build`. `docker-build-and-test` runs the JUnit tests inside the container, builds the image, starts it and runs [the smoke test](scripts/smoke-test.sh). Both must pass before merging
 
 Meeting weekly Friday @ 4:30pm for sync meetings.
@@ -48,7 +48,7 @@ docker run -d --name mentor-matching -p 8080:8080 mentor-matching
 sh scripts/smoke-test.sh http://localhost:8080    # pages, auth and one connection lifecycle
 ```
 
-The smoke test needs a fresh service in stub mode, because it creates the demo profiles. It also works against `java -cp out MentoringApp`.
+The smoke test needs a fresh service in stub mode, because it creates the demo profiles. It also works against `java -cp out MentoringApp`. It covers every page, auth, and one connection from request to completion, including the session log and scheduling.
 
 ## Configuration
 
@@ -98,7 +98,25 @@ Tokens it accepts:
 - Connections page (`static/connections.html`): students request a recommended mentor, mentors accept or decline, either side completes or ends a connection and keeps shared notes
 - Recommended mentors on the student profile page
 
-**Not started:** session scheduling, notifications to Subsystem 8.
+**Sprint 4 — done** ([plan, code quality and retro](docs/sprint4.md))
+
+- CI builds and runs the JUnit tests inside the container, then starts it and runs [the smoke test](scripts/smoke-test.sh)
+- Branch protection on `main`: pull requests only, with `lint-and-test` and `docker-build-and-test` required
+- Code-quality report: coverage, warnings and actions
+
+**Sprint 5 — feature set complete** (contracts: [v2](docs/interface-contracts-v2.md))
+
+- Contact by email: while a connection is `ACTIVE`, each side sees the other's email from Shared Core, with an "Email your mentor / mentee" button on the connections page. Mentor Matching has no messaging, as the SOW asks
+- Session log (`GET|POST /connections/{id}/sessions`): either side records a session that took place, with a date and summary
+- Session scheduling (`GET|POST|PUT /connections/{id}/schedule`): one side proposes a time, the other confirms or cancels it, and a confirmed time downloads as an `.ics` calendar file
+- Fix: a session logged in the evening without a date was dated the next day, because "today" was taken in UTC. It now uses GMU's time zone (`America/New_York`)
+- Unit tests for the session log and the scheduling rules; session log and scheduling added to the smoke test and to contracts v2
+
+**Not done yet:**
+
+- Notifications (Subsystem 6): `POST /notifications/dispatch` on a new request and on accept or decline
+- Pagination on `GET /connections`, `GET /connections/{id}/sessions` and the recommendations routes (the SOW asks for it on every list endpoint)
+- Running against the real Shared Core in the shared docker-compose environment (see [Stub mode](#stub-mode))
 
 ## Layout
 
@@ -109,7 +127,7 @@ static/            HTML, JS and CSS served on the same port
 docs/
   architecture.md            Architecture (Sprint 1, plus Sprint 3 additions)
   interface-contracts-v1.md  Profiles and directory
-  interface-contracts-v2.md  Recommendations and connections
+  interface-contracts-v2.md  Recommendations, connections, session log and scheduling
   sprint3.md                 Sprint 3 plan and retro
   sprint4.md                 Sprint 4 plan, code quality and retro
   adr/                       Architecture decision records
@@ -126,16 +144,19 @@ Dockerfile         Builds and runs the whole subsystem; its `test` stage runs th
 | - | - | - |
 | `static/*.html` | Presentation | Forms for each profile type, plus the connections page |
 | `static/app.js` | Presentation | Calls our endpoints, renders results and field errors |
-| `static/connections.js` | Presentation | Connections page: request, accept/decline, complete/withdraw, shared notes |
+| `static/connections.js` | Presentation | Connections page: request, accept/decline, complete/withdraw, shared notes, email, next session |
 | `MentoringApp.java` | API | Starts the server, defines routes, validates tokens and input |
 | `ProfileBinding.java` | API | Request JSON to domain objects, one message per bad field |
 | `ApiException.java` | API | The shared `{error, code, detail}` format |
 | `Json.java` | API | JSON reader and writer (no Jackson; no runtime dependencies) |
 | `EditProfile.java` | API | Applies a partial update for the signed-in role |
-| `ConnectionService.java` | API | Who may make which connection move; keeps `activeMentees` in step |
+| `ConnectionService.java` | API | Who may make which connection move; keeps `activeMentees` in step; session log and scheduling |
 | `MentorProfile.java` | Domain | Mentor attributes and their rules |
 | `StudentMatchProfile.java` | Domain | Student matching attributes and their rules |
 | `Connection.java`, `ConnectionStatus` | Domain | One connection and its lifecycle rules |
+| `SessionLogEntry.java` | Domain | One recorded session on a connection |
+| `SessionProposal.java` | Domain | A proposed or confirmed time for the next session |
+| `InvalidFieldException.java` | Domain | A complaint about one named field's value, which the API reports as a `400` |
 | `Industry`, `GuidanceArea`, `ContactMethod` | Domain | Shared vocabularies (ADR-002) |
 | `ProfileText.java` | Domain | Free-text normalization both profiles share |
 | `MentorMatcher.java` | Domain | Weighted compatibility score behind recommendations |
@@ -145,6 +166,9 @@ Dockerfile         Builds and runs the whole subsystem; its `test` stage runs th
 
 ## Known gaps
 
-- **Everything resets on restart,** because storage is in memory until the attribute split with Shared Core is settled (ADR-001). That now includes connections.
+- **Everything resets on restart,** because storage is in memory until the attribute split with Shared Core is settled (ADR-001). That includes connections, session logs and schedules.
+- **Notifications are not sent yet.** A mentor sees new requests by opening the connections page.
+- **List endpoints other than `GET /mentors` are not paginated** (see Sprint 5 above).
+- **Email sharing assumes** Shared Core's `/users/{id}` returns `email` and that showing it to an active mentor or mentee is allowed; both still need confirming with Shared Core.
 - **Stub mode is still on by default** (see above).
 - **`Industry` values are placeholders** pending sign-off with Shared Core and Subsystems 2 and 8.
