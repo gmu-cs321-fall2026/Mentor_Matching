@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
 }
 
 repositories {
@@ -31,4 +32,43 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnitPlatform()
+    // Every test run also writes the coverage report.
+    finalizedBy jacocoTestReport
 }
+
+// Coverage from the unit tests. Reports land in build/reports/jacoco/test/:
+// html/index.html to browse, jacocoTestReport.csv for the CI summary,
+// jacocoTestReport.xml for tools.
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = true
+    }
+}
+
+// The floor: `./gradlew build` (and so CI) fails if coverage drops below it.
+// Set in Sprint 5 a little under what the tests reached (93.6% lines, 87.3%
+// branches), so it catches a real drop without failing on small changes.
+jacocoTestCoverageVerification {
+    dependsOn test
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                minimum = 0.85
+            }
+            limit {
+                counter = 'BRANCH'
+                minimum = 0.75
+            }
+        }
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification

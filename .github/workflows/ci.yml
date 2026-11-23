@@ -24,8 +24,22 @@ jobs:
       - name: Make the Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Build and test
+      - name: Build, test and check coverage
+        # build runs the JUnit tests, writes the JaCoCo report and fails if
+        # coverage is under the floor set in build.gradle.
         run: ./gradlew build
+
+      - name: Coverage summary
+        if: always()
+        run: sh scripts/coverage-summary.sh >> "$GITHUB_STEP_SUMMARY" || echo "No coverage report (the build failed before the tests ran)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/jacoco/test/html
+          if-no-files-found: ignore
 
   docker-build-and-test:
     name: docker-build-and-test

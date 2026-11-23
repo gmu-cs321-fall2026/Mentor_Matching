@@ -69,8 +69,8 @@ Measured on `main` after PR #14. Coverage comes from JaCoCo, applied through a t
 
 ### Actions
 
-- [ ] Add `JsonTest` (round trips, escapes, nested values, malformed input) and `ProfileBindingTest` (one message per bad field)
-- [ ] Add JaCoCo to `build.gradle` so CI reports coverage on every PR, and set a floor once the API tests exist
+- [x] Add `JsonTest` (round trips, escapes, nested values, malformed input) and `ProfileBindingTest` (one message per bad field). Done in Sprint 5 (SCRUM-31), along with `EditProfileTest`, `MentoringAppTest` and `SharedCoreClientTest`
+- [x] Add JaCoCo to `build.gradle` so CI reports coverage on every PR, and set a floor once the API tests exist. Done in Sprint 5: floor of 85% lines, 75% branches
 - [ ] Split routes out of `MentoringApp` into one class per resource (profiles, directory, connections)
 - [ ] Move the shared helpers in `app.js` and `connections.js` into one script both pages load
 

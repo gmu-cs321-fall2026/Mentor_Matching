@@ -210,6 +210,11 @@ final class SharedCoreClient {
             return "";
         }
         String value = header.trim();
+        // "Bearer " with nothing after it trims to "Bearer"; that is no token,
+        // not a token spelled "Bearer".
+        if (value.equalsIgnoreCase("Bearer")) {
+            return "";
+        }
         if (value.regionMatches(true, 0, "Bearer ", 0, 7)) {
             value = value.substring(7).trim();
         }

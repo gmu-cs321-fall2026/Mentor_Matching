@@ -8,7 +8,7 @@ This service handles mentor and student matching profiles, ranked mentor recomme
 - **Frontend:** plain HTML and JavaScript, served by the same process on one port
 - **Architecture:** [docs/architecture.md](docs/architecture.md) · decisions in [docs/adr/](docs/adr/) · contracts in [v1](docs/interface-contracts-v1.md) (profiles, directory) and [v2](docs/interface-contracts-v2.md) (recommendations, connections)
 - **Sprint plans and retros:** [Sprint 1](docs/sprint1-retrospective.md) · [Sprint 3](docs/sprint3.md) · [Sprint 4](docs/sprint4.md) (includes the code-quality report)
-- **CI:** every pull request into `main` runs two checks ([workflow](.github/workflows/ci.yml)). `lint-and-test` runs `./gradlew build`. `docker-build-and-test` runs the JUnit tests inside the container, builds the image, starts it and runs [the smoke test](scripts/smoke-test.sh). Both must pass before merging
+- **CI:** every pull request into `main` runs two checks ([workflow](.github/workflows/ci.yml)). `lint-and-test` runs `./gradlew build`, which also checks coverage against a floor (85% of lines, 75% of branches) and posts a coverage table on the run's summary page. `docker-build-and-test` runs the JUnit tests inside the container, builds the image, starts it and runs [the smoke test](scripts/smoke-test.sh). Both must pass before merging
 
 Meeting weekly Friday @ 4:30pm for sync meetings.
 
@@ -37,7 +37,9 @@ Then open <http://localhost:8080/>. The mentor and student forms and the connect
 gradlew.bat build      # Windows
 ```
 
-This compiles `backend/src` and runs the JUnit tests in `backend/test`, the same as the `lint-and-test` check. No Gradle install is needed; the wrapper downloads it.
+This compiles `backend/src`, runs the JUnit tests in `backend/test`, writes the JaCoCo coverage report and fails if coverage is under the floor, the same as the `lint-and-test` check. No Gradle install is needed; the wrapper downloads it.
+
+Coverage report: open `build/reports/jacoco/test/html/index.html`, or print a table with `sh scripts/coverage-summary.sh`. The API layer is tested over real HTTP: `MentoringAppTest` starts the service on a free port in stub mode, and `SharedCoreClientTest` runs live mode against a fake Shared Core.
 
 What the `docker-build-and-test` check runs:
 
@@ -111,6 +113,9 @@ Tokens it accepts:
 - Session scheduling (`GET|POST|PUT /connections/{id}/schedule`): one side proposes a time, the other confirms or cancels it, and a confirmed time downloads as an `.ics` calendar file
 - Fix: a session logged in the evening without a date was dated the next day, because "today" was taken in UTC. It now uses GMU's time zone (`America/New_York`)
 - Unit tests for the session log and the scheduling rules; session log and scheduling added to the smoke test and to contracts v2
+- API-layer tests (SCRUM-31): `JsonTest`, `ProfileBindingTest`, `EditProfileTest`, `MentoringAppTest` (every route over HTTP) and `SharedCoreClientTest` (live mode against a fake Shared Core). 119 tests in all; line coverage is up from 39.9% to 93.6%, and branch coverage from 35.9% to 87.3%
+- JaCoCo coverage in the build and in CI, with a floor of 85% of lines and 75% of branches
+- Fixes the new tests found: a refused profile `PUT` (one bad field, or a result that is not valid) returned 400 but had already changed the stored profile; deeply nested JSON overflowed the stack and got no response at all instead of a 400; an `Authorization: Bearer ` header with no token was sent to Shared Core as the token `Bearer`, which turned into a 502 instead of a 401
 
 **Not done yet:**
 
@@ -134,6 +139,7 @@ docs/
   ai-log/                    AI prompt logs
 .github/workflows/ci.yml  CI checks run on every PR
 scripts/smoke-test.sh     Smoke test against a running service
+scripts/coverage-summary.sh  Coverage table from the JaCoCo report (used by CI)
 build.gradle       Build and test configuration
 Dockerfile         Builds and runs the whole subsystem; its `test` stage runs the JUnit tests
 ```
