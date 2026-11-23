@@ -16,8 +16,17 @@ import java.util.Map;
  */
 final class Json {
 
+    /**
+     * Deepest nesting of objects and arrays we read. The reader is recursive, so
+     * without a limit a body of thousands of brackets overflows the stack, and
+     * a {@link StackOverflowError} is not an exception the routes turn into a
+     * 400. Our own contracts nest three levels at most.
+     */
+    static final int MAX_DEPTH = 100;
+
     private final String text;
     private int pos;
+    private int depth;
 
     private Json(String text) {
         this.text = text;
@@ -128,8 +137,18 @@ final class Json {
     private Object readValue() {
         char c = peek();
         return switch (c) {
-            case '{' -> readObject();
-            case '[' -> readArray();
+            case '{' -> {
+                enter();
+                Map<String, Object> map = readObject();
+                depth--;
+                yield map;
+            }
+            case '[' -> {
+                enter();
+                List<Object> items = readArray();
+                depth--;
+                yield items;
+            }
             case '"' -> readString();
             case 't' -> {
                 expect("true");
@@ -145,6 +164,13 @@ final class Json {
             }
             default -> readNumber();
         };
+    }
+
+    private void enter() {
+        if (++depth > MAX_DEPTH) {
+            throw new IllegalArgumentException("JSON is nested too deeply (more than "
+                    + MAX_DEPTH + " levels)");
+        }
     }
 
     private Map<String, Object> readObject() {
@@ -235,7 +261,12 @@ final class Json {
                     if (pos + 4 > text.length()) {
                         throw new IllegalArgumentException("truncated unicode escape");
                     }
-                    out.append((char) Integer.parseInt(text.substring(pos, pos + 4), 16));
+                    String hex = text.substring(pos, pos + 4);
+                    try {
+                        out.append((char) Integer.parseInt(hex, 16));
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException("bad unicode escape \\u" + hex);
+                    }
                     pos += 4;
                 }
                 default -> throw new IllegalArgumentException("bad escape \\" + escape);

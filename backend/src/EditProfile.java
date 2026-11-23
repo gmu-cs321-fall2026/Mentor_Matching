@@ -26,6 +26,14 @@ import java.util.UUID;
  *       {@code ProfileBinding.apply(profile, body)}, keeping JSON maps out of
  *       the domain classes.</li>
  * </ol>
+ *
+ * <p>A refused edit changes nothing (Sprint 5). The body is applied to a draft
+ * copy and the draft is validated; only then are the editable attributes
+ * copied onto the stored profile. Before this, a request with one bad field,
+ * or one that left the profile invalid (no guidance areas), returned 400 but
+ * had already changed the stored profile. The stored object is updated rather
+ * than replaced, so an {@code activeMentees} change made by an accept at the
+ * same moment is never overwritten.
  */
 public class EditProfile {
 
@@ -56,11 +64,45 @@ public class EditProfile {
 
         if (isMentor) {
             MentorProfile profile = data.findMentor(userId);
-            ProfileBinding.apply(profile, body);
+            MentorProfile draft = new MentorProfile(userId);
+            copyEditable(profile, draft);
+            draft.setActiveMentees(profile.getActiveMentees());
+            ProfileBinding.apply(draft, body);
+            require(draft.validate());
+            copyEditable(draft, profile);
             return data.updateMentor(profile);
         }
         StudentMatchProfile profile = data.findStudent(userId);
-        ProfileBinding.apply(profile, body);
+        StudentMatchProfile draft = new StudentMatchProfile(userId);
+        copyEditable(profile, draft);
+        ProfileBinding.apply(draft, body);
+        require(draft.validate());
+        copyEditable(draft, profile);
         return data.updateStudent(profile);
+    }
+
+    /** Every attribute a mentor may edit; {@code activeMentees} belongs to connections. */
+    private static void copyEditable(MentorProfile from, MentorProfile to) {
+        to.setIndustry(from.getIndustry());
+        to.setGuidanceAreas(from.getGuidanceAreas());
+        to.setTechnicalDomains(from.getTechnicalDomains());
+        to.setHoursPerMonth(from.getHoursPerMonth());
+        to.setContactMethod(from.getContactMethod());
+        to.setMaxMentees(from.getMaxMentees());
+        to.setAcceptingMentees(from.isAcceptingMentees());
+    }
+
+    private static void copyEditable(StudentMatchProfile from, StudentMatchProfile to) {
+        to.setTargetIndustries(from.getTargetIndustries());
+        to.setGuidanceWanted(from.getGuidanceWanted());
+        to.setTargetRoles(from.getTargetRoles());
+        to.setTargetCompanies(from.getTargetCompanies());
+        to.setPreferSameProgram(from.isPreferSameProgram());
+    }
+
+    private static void require(Map<String, String> fieldErrors) {
+        if (!fieldErrors.isEmpty()) {
+            throw ApiException.fields(fieldErrors);
+        }
     }
 }

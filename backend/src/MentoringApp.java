@@ -47,6 +47,35 @@ public class MentoringApp {
         Path staticDir = Path.of(env("STATIC_DIR", "static")).toAbsolutePath().normalize();
 
         SharedCoreClient sharedCore = new SharedCoreClient(sharedCoreUrl);
+        start(port, sharedCore, staticDir);
+
+        System.out.println("Mentor Matching listening on port " + port);
+        System.out.println("  static files: " + staticDir);
+        System.out.println("  shared core:  " + (sharedCore.isStub()
+                ? "STUB MODE - no SHARED_CORE_URL set; demo and test use only"
+                : sharedCoreUrl));
+        System.out.println("  storage:      in memory (resets on restart); DB_URL="
+                + (dbUrl.isEmpty() ? "(unset)" : dbUrl));
+        if (sharedCore.isStub()) {
+            System.out.println("  stub tokens:  mentor-demo, student-demo, <uuid>:<Role>");
+        }
+    }
+
+    /**
+     * Wires the store and services to the routes and starts listening.
+     *
+     * <p>Separate from {@link #main} so tests can run the real routes on a free
+     * port ({@code port} 0) against a stub or fake Shared Core.
+     *
+     * @param port the port to listen on; 0 picks a free one
+     * @param sharedCore where tokens are validated and base profiles come from
+     * @param staticDir the folder the pages are served from
+     * @return the running server; callers stop it with {@code stop(0)}
+     */
+    static HttpServer start(int port, SharedCoreClient sharedCore, Path staticFolder)
+            throws IOException {
+        // staticFile() checks every resolved path stays inside this folder.
+        Path staticDir = staticFolder.toAbsolutePath().normalize();
         // The only place that names an implementation; everything else uses the
         // ProfileData interface, per ADR-001.
         ProfileData data = new InMemoryProfileData(sharedCore);
@@ -93,17 +122,7 @@ public class MentoringApp {
         server.createContext("/", route(exchange -> staticFile(exchange, staticDir)));
         server.setExecutor(Executors.newFixedThreadPool(8));
         server.start();
-
-        System.out.println("Mentor Matching listening on port " + port);
-        System.out.println("  static files: " + staticDir);
-        System.out.println("  shared core:  " + (sharedCore.isStub()
-                ? "STUB MODE - no SHARED_CORE_URL set; demo and test use only"
-                : sharedCoreUrl));
-        System.out.println("  storage:      in memory (resets on restart); DB_URL="
-                + (dbUrl.isEmpty() ? "(unset)" : dbUrl));
-        if (sharedCore.isStub()) {
-            System.out.println("  stub tokens:  mentor-demo, student-demo, <uuid>:<Role>");
-        }
+        return server;
     }
 
     /** {@code POST|GET|PUT /mentors/profile} — the mentor's own profile. */
