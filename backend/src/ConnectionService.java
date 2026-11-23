@@ -7,7 +7,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 
@@ -25,6 +25,13 @@ import java.util.ArrayList;
  * a transaction instead.
  */
 public class ConnectionService {
+
+    /**
+     * The time zone a session's default date is taken in. Everyone using the
+     * platform is on GMU's campus clock, so "today" means today in Virginia, not
+     * in UTC: a session logged at 8 pm Eastern is still dated that day.
+     */
+    static final ZoneId CAMPUS_ZONE = ZoneId.of("America/New_York");
 
     /** Fields a client may send to {@code PUT /connections/{id}}. */
     static final Set<String> UPDATE_FIELDS = Set.of("status", "notes");
@@ -196,7 +203,7 @@ public class ConnectionService {
      * Either participant records a session on an active connection.
      *
      * @param body {@code summary} (required) and {@code heldOn} as YYYY-MM-DD
-     *     (optional, defaults to today)
+     *     (optional, defaults to today in {@link #CAMPUS_ZONE})
      * @return the new entry
      * @throws ApiException 400 for a bad body, 404 if the connection does not exist
      *     or the caller is not on it, 409 if the connection is not active or its log is full
@@ -217,7 +224,7 @@ public class ConnectionService {
         } else if (!(summary instanceof String)) {
             errors.put("summary", "expected text");
         }
-        LocalDate heldOn = LocalDate.now(ZoneOffset.UTC);
+        LocalDate heldOn = LocalDate.now(clock.withZone(CAMPUS_ZONE));
         Object rawDate = body.get("heldOn");
         if (rawDate != null) {
             try {
