@@ -10,7 +10,7 @@
 
 <header>
   <h1>Mentor Matching</h1>
-  <p>Mason CareerLaunch &middot; Subsystem 4 &middot; Sprint 3</p>
+  <p>Mason CareerLaunch &middot; Subsystem 4 &middot; Sprint 5</p>
 </header>
 
 <main>
@@ -27,7 +27,8 @@
     </p>
     <p>
       <a href="connections.html">Connections</a> — students request a recommended mentor; mentors
-      accept or decline; either side completes or ends an active connection and keeps shared notes.
+      accept or decline; on an active connection either side can email the other, keep shared notes,
+      propose and confirm the next session time, and complete or end the connection.
     </p>
   </section>
 
@@ -50,6 +51,11 @@
         <tr><td>GET /connections</td><td>Any signed in</td><td>Your connections, newest first</td></tr>
         <tr><td>GET /connections/{id}</td><td>Either participant</td><td>One connection</td></tr>
         <tr><td>PUT /connections/{id}</td><td>Either participant</td><td>Accept, decline, withdraw, complete, or edit shared notes</td></tr>
+        <tr><td>GET /connections/{id}/sessions</td><td>Either participant</td><td>The session log, oldest first</td></tr>
+        <tr><td>POST /connections/{id}/sessions</td><td>Either participant</td><td>Record a session that took place</td></tr>
+        <tr><td>GET /connections/{id}/schedule</td><td>Either participant</td><td>The next session's proposed or confirmed time</td></tr>
+        <tr><td>POST /connections/{id}/schedule</td><td>Either participant</td><td>Propose a time for the next session</td></tr>
+        <tr><td>PUT /connections/{id}/schedule</td><td>Either participant</td><td>Confirm or cancel the proposed time</td></tr>
         <tr><td>GET /enums</td><td>Public</td><td>Agreed Industry, GuidanceArea and ContactMethod values</td></tr>
         <tr><td>GET /health</td><td>Public</td><td>Liveness check for compose and the gateway</td></tr>
       </tbody>

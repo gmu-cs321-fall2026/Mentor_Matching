@@ -199,4 +199,4 @@ Design rules:
 | Risk | Fallback |
 | - | - |
 | Demand far exceeds mentor supply, so most requests sit in `PENDING` | Requests are only accepted for mentors with room; consider an expiry for old pending requests in Sprint 4 |
-| Notifications (Subsystem 8) contract not ready | Connections work without it; the mentor sees pending requests through `GET /connections` |
+| Notifications (Subsystem 6) contract not ready | Connections work without it; the mentor sees pending requests through `GET /connections` |

@@ -14,6 +14,11 @@ Subsystem 4 of Mason CareerLaunch. **v2 adds recommendations and connections; ev
 | `GET /connections` | Any signed-in role | The caller's connections, as student or mentor, newest first |
 | `GET /connections/{id}` | Either participant | One connection |
 | `PUT /connections/{id}` | Either participant | Accept, decline, withdraw, complete, or edit shared notes |
+| `GET /connections/{id}/sessions` | Either participant | The session log, oldest first |
+| `POST /connections/{id}/sessions` | Either participant | Record a session that took place |
+| `GET /connections/{id}/schedule` | Either participant | The next session's proposed or confirmed time |
+| `POST /connections/{id}/schedule` | Either participant | Propose a time for the next session |
+| `PUT /connections/{id}/schedule` | Either participant | Confirm or cancel the proposed time |
 
 ## Recommendations
 
@@ -45,12 +50,19 @@ Errors: `404` if the caller has no matching profile yet; `403` if `{userId}` is 
 ```json
 { "id": "f314cadd-595e-40f3-9c15-86437e0eb747",
   "studentId": "22222222-2222-2222-2222-222222222222", "studentName": "Demo Student",
+  "studentEmail": "student@example.com",
   "mentorId": "11111111-1111-1111-1111-111111111111", "mentorName": "Demo Mentor",
+  "mentorEmail": "mentor@example.com",
   "status": "ACTIVE", "message": "Hi!", "notes": "Weekly on Tuesdays",
-  "createdAt": "2026-10-17T20:40:12.345Z", "updatedAt": "2026-10-17T20:41:03.210Z" }
+  "schedule": null,
+  "createdAt": "2026-10-17T20:40:12.345Z", "updatedAt": "2026-10-17T20:41:03.210Z",
+  "sessions": [] }
 ```
 
-Names come from Shared Core at read time and are `null` if Shared Core does not know the user.
+- Names and emails come from Shared Core at read time and are `null` if Shared Core does not know the user.
+- `studentEmail` and `mentorEmail` are filled in only while the connection is `ACTIVE`; otherwise they are `null`. Mentor Matching has no messaging, so this is how the two people reach each other. A pending request does not reveal the student's email, and a closed connection stops sharing either email.
+- `schedule` is the next session's time (see [Session scheduling](#session-scheduling)), or `null`.
+- `sessions` is the session log (see [Session log](#session-log)). It is included only by `GET /connections/{id}` and `PUT /connections/{id}`, not in the `GET /connections` list.
 
 ### `POST /connections`
 
@@ -83,6 +95,38 @@ Send `status`, `notes`, or both. A request that fails changes nothing.
 | `403` | the move belongs to the other side (e.g. a student accepting) |
 | `404` | no such connection, or the caller is not on it |
 | `409` | the move is not allowed from the current status, the mentor is full when accepting, or notes on a connection that is not active |
+
+## Session log
+
+Either participant records a session after it happens: the date and a short summary. Mentor Matching keeps the log for the participants' own reference; it is not shared with anyone else.
+
+| Method & path | Who | Purpose |
+| - | - | - |
+| `POST /connections/{id}/sessions` | Either participant | Record a session (connection must be `ACTIVE`) |
+| `GET /connections/{id}/sessions` | Either participant | The log, oldest first; still readable after the connection ends |
+
+**`POST` body**
+
+| Field | Type | Rules |
+| - | - | - |
+| `summary` | string | required; not blank; max 2000 chars |
+| `heldOn` | string | optional; `YYYY-MM-DD`; defaults to today in GMU's time zone (`America/New_York`); may not be later than tomorrow (UTC), to allow for time zones |
+
+**Response** (`201` from `POST` with the new entry; `200` from `GET` with an array of entries)
+
+```json
+{ "id": "437603a2-6221-47bb-befb-c481cd7a112d", "heldOn": "2026-11-23",
+  "summary": "Resume review over Zoom",
+  "loggedBy": "22222222-2222-2222-2222-222222222222",
+  "loggedAt": "2026-11-23T16:00:08.588Z" }
+```
+
+| Error | When |
+| - | - |
+| `400` | `summary` missing, blank, not text or too long; `heldOn` badly formatted or in the future; unknown field |
+| `404` | no such connection, or the caller is not on it |
+| `405` | any method other than `GET` or `POST` |
+| `409` | the connection is not `ACTIVE`, or its log already has 200 entries |
 
 ## Session scheduling
 
@@ -129,6 +173,6 @@ When the connection leaves `ACTIVE`, an unconfirmed proposal is dropped and a co
 
 ## Open items before this goes on the wiki
 
-- **Notifications (Subsystem 8)** should hear about a new request and an accept or decline. Not wired yet; needs their contract.
+- **Notifications (Subsystem 6)** should hear about a new request and an accept or decline. Not wired yet; needs their contract.
 - **Staff and admin access.** Today only the two participants can read a connection. Career Services Staff reporting on connections needs a route agreed with them.
 - **Confirm the `/connections` prefix with Shared Core** for the gateway, as with `/mentors` and `/students`.
